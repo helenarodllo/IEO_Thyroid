@@ -22,7 +22,7 @@ bibliography: bibliography.bib
 
 # Introduction
 
-Thyroid cancer (THCA) is the most common endocrine malignancy. It is thought that more than 60% of the
+Thyroid carcinoma (THCA) is the most common type of thyroid cancer, which is the most common endocrine malignancy. It is thought that more than 60% of the
 population has thyroid nodules, but only a 8-16% of these will become malignant. Thus,
 TC only represents a 2.3% of all cancers worldwide. It affects more women than men. The
 Cancer Genome Atlas (TCGA) has comprehensively profiled this type of cancer
