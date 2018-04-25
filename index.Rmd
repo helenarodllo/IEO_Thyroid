@@ -1,0 +1,71 @@
+---
+title: "Analysis of a TCGA RNA-seq data set on Thyroid Carcinoma"
+author:
+- name: Lydia Fortea Gonzalez
+  affiliation:
+  - &id Master Programme on Bioinformatics for Health Sciences, Universitat Pompeu Fabra, Barcelona, Spain
+  email: lydia.fortea01@estudiant.upf.edu
+- name: Julia Mir Pedrol
+  affiliation: *id
+  email: julia.mir01@estudiant.upf.edu
+- name: Helena Rodriguez Lloveras
+  affiliation: *id
+  email: helena.rodriguez01@estudiant.upf.edu
+date: "`r format(Sys.time(), '%B %e, %Y')`"
+output: 
+  BiocStyle::html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+bibliography: bibliography.bib
+---
+
+# Introduction
+
+Thyroid cancer (THCA) is the most common endocrine malignancy. It is thought that more than 60% of the
+population has thyroid nodules, but only a 8-16% of these will become malignant. Thus,
+TC only represents a 2.3% of all cancers worldwide. It affects more women than men. The
+Cancer Genome Atlas (TCGA) has comprehensively profiled this type of cancer
+in a patient cohort. Here we analyze the expression profiles of those
+patients, accessible in the form of a raw RNA-seq counts produced by
+@rahman2015alternative using a pipeline based on the R/Bioconductor
+software package `r Biocpkg("Rsubread")`.
+
+This document is written in [R markdown](https://rmarkdown.rstudio.com) and
+should be processed using R and you need to install the packages
+`r CRANpkg("knitr")` and `r CRANpkg("markdown")`. Moreover, it using the official
+style for Bioconductor vignettes facilitated by the Bioconductor package
+`r Biocpkg("BiocStyle")`. Please consult that package documentation, and particularly
+the [vignette](http://bioconductor.org/packages/release/bioc/vignettes/BiocStyle/inst/doc/AuthoringRmdVignettes.html)
+on "Authoring R Markdown vignettes", for full details on how to elaborate this
+kind of documents.
+
+The specific instructions to generate the final HTML report are written in a
+[Makefile](https://en.wikipedia.org/wiki/Makefile). To run it you just need to type
+
+   ```
+   $ make
+   ```
+
+on the unix shell. The `makefile` contains instructions to separately process
+the different files that integrate this report, and so only the file that has
+been modified will be rebuilt. If you wish to remove or add files to be processed,
+you should modify the `makefile`.
+
+The directory `results` will contain resulting files produced during the analysis,
+however, figures are going to end by default directories associated with the
+source filenames from where they were created.
+
+```{r echo=FALSE, results='asis'}
+cat(readLines("QAanalysis.knit.md"), sep="\n")
+```
+
+```{r echo=FALSE, results='asis'}
+cat(readLines("DEanalysis.knit.md"), sep="\n")
+```
+
+```{r echo=FALSE, results='asis'}
+cat(readLines("FEanalysis.knit.md"), sep="\n")
+```
+
+# References
