@@ -358,6 +358,21 @@ We make a filtering between samples
 plotMDS(dge.filt3, col = c("red", "blue")[as.integer(dge.filt3$samples$group)], cex = 0.7)
 legend("topleft", c("normal", "tumor"), fill = c("red", "blue"), inset = 0.05, cex = 0.7)
 ```
+Tumors near red points, they don't have the same mutations, and they also are not so aggresive.
+
+*Normalization between Samples* LOOK
+```{r}
+m <- matrix(assays(thca.filt3)$counts, nrow=6654, ncol=555, byrow=TRUE)
+dimnames(m) <- list(rownames(thca.filt3), colnames(thca.filt3))
+#floor(colMeans(m))
+#apply(m, 2, sd)
+originalOrder <- apply(m, 2, order)
+m <- apply(m, 2, sort)
+m <- matrix(rep(floor(rowMeans(m))))
+m <- sapply(1:ncol(m), function(x) m[order(originalOrder[, x]), x])
+floor(colMeans(m))
+apply(m, 2, sd)
+```
 
 ## Batch identification
 
@@ -382,7 +397,7 @@ table(samplevial)
 
 From this information we can make the following observations:
 
-  * All samples were sequenced at the same center (507)
+  * All samples were sequenced at the same center (07)
 
   * In this dataset, we can find six different combinations of tissue type and vial, it can be a potential batch.
 
@@ -390,15 +405,7 @@ From this information we can make the following observations:
 
   * Different samples were sequenced with different plates, so it can be also a potential batch.
 
-```{r}
-colnames(thca.filt)[plate == "A10U"]
-```
-
   * Most of the samples were sequenced using one portion and analyte combinations, but there is other 5 different portion and analyte combinations
-
-```{r}
-colnames(se.filt)[portionanalyte == "21R"]
-```
 
 From this data we can consider as possible surrogates of batch effect indicator the tssm, plate, portionanalytic and samplevial.
 
@@ -408,7 +415,7 @@ of interest as molecular changes between sample types, tumor vs. normal, we will
 the cross-classification of this outcome with TSS.
 
 ```{r}
-table(data.frame(TYPE=thca.filt$type, TSS=tss))
+table(data.frame(TYPE=thca.filt3$type, TSS=tss))
 ```
 
 Observe that normal tissues from most of TSS are under-represented with respect to the tumor tissues. If TSS is a source of expression variability, this under-representation in the normal samples may lead to a potential confounding effect.
@@ -419,14 +426,14 @@ calculate again log CPM values with a higher prior count to moderate extreme fol
 produced by low counts. The resulting dendrogram is shown in Figure \@ref(fig:sampleClustering).
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S6: Hierarchical clustering of the samples."}
-logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(tss))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
-names(outcome) <- colnames(thca.filt)
+names(batch) <- colnames(thca.filt3)
+outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt3)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -439,9 +446,8 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(tss))), fill=sort(unique(batch)))
 ```
 
-We can observe that samples cluster primarily by sample type, tumor or normal. TSS seems to have
-a stronger effect among the normal samples, while it distributes better among the tumor samples.
-We may consider discarding samples leading to an unbalanced distribution of the outcome across batches.
+We can observe there is not evident clustering depending of the tss, so we can descard it as a 
+possible batch.
 
 In Figure \@ref(fig:mdsPlot) we show the corresponding MDS plot. Here we see more clearly that the
 first source of variation separates tumor from normal samples. We can also observe that two tumor
@@ -459,18 +465,18 @@ legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(tss))),
 
 *Plate*
 ```{r}
-table(data.frame(TYPE=thca.filt$type, plate=plate))
+table(data.frame(TYPE=thca.filt3$type, plate=plate))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S8: Hierarchical clustering of the samples by Plate."}
-logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(plate))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
-names(outcome) <- colnames(thca.filt)
+names(batch) <- colnames(thca.filt3)
+outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt3)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -496,14 +502,14 @@ table(data.frame(TYPE=thca.filt$type, PA=portionanalyte))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S10: Hierarchical clustering of the samples by Portion Analyuc."}
-logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(portionanalyte))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
-names(outcome) <- colnames(thca.filt)
+names(batch) <- colnames(thca.filt3)
+outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt3)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -529,14 +535,14 @@ table(data.frame(TYPE=thca.filt$type, SV=samplevial))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S12: Hierarchical clustering of the samples by Portion Analyuc."}
-logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(samplevial))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
-names(outcome) <- colnames(thca.filt)
+names(batch) <- colnames(thca.filt3)
+outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt3)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -549,7 +555,8 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-
+From this hierchical clustering plot, we can observe that there is a different cluster depending 
+of the samplevial we use, so they can confounding with the interest outcome we want.
 ```{r mdsPlot, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S11: Multidimensional scaling plot of the samples."}
 plotMDS(dge.filt, labels=outcome, col=batch)
 legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(samplevial))),
