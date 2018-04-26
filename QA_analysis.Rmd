@@ -9,22 +9,6 @@ output:
   BiocStyle::html_document
 ---
 
-<!---
-The following chunk of code, which should not be shown in the resulting document (echo=FALSE)
-sets up global processing options, such as forcing 'knitr' to stop when an error
-in the R code is encountered, caching of the results in the 'cache'
-directory and asking 'knitr' to figure out automatically the dependencies among
-code chunks to re-calculate cached results (autodep=TRUE).
-
-Other options could be changing the name of the directory where figures end up
-('figure' by default), etc. For a full account of 'knitr' options please consult
-http://yihui.name/knitr/options
-
-At the end of the chunk a 'cat()' call is made to dump a CSS file that gives
-a better look-and-feel than the knitr default one. See the source css/ieo.css
-and the resulting projectTemplate.html to understand where this is being dumpted.
---->
-
 
 ```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
 library(knitr)
@@ -43,10 +27,6 @@ opts_chunk$set(cache=TRUE,
 
 We start importing the raw table of counts.
 
-<!--
-The option 'message=FALSE' avoid dumping R messages such as "Loading required package: methods"
-into the output of the report.
--->
 
 ```{r, message=FALSE}
 library(SummarizedExperiment)
@@ -72,6 +52,8 @@ not more self-explanatory than the variable name itself, and the other called
 identifier can be use in https://cdebrowser.nci.nih.gov to search for further
 information about the associated clinical variable using the `Advanced search`
 form and the `Public ID` attribute search.
+
+Those data are from the "Alternative preprocessing of RNA-Sequencing data in The Cancer Genome Atlas leads to improved analysis results" project, with 20115 analyzed genes and 572 samples. 
 
 Now, explore the row (feature) data.
 
@@ -101,16 +83,11 @@ assays(thca)$logCPM[1:5, 1:5]
 
 ## Sequencing depth
 
-Let's examine the sequencing depth in terms of total number of sequence read counts
+In this part, we examine the sequencing depth in terms of total number of sequence read counts
 mapped to the genome per sample. Figure \@ref(fig:libsizes) below shows the
 sequencing depth per sample, also known as library sizes, in increasing order.
 
-<!---
-you can control the height and width in pixels of the figure with 'out.height' and
-'out.width'. Figures are automatically numbered, to refer to them in the main test
-you should use the notation shown above as \@ref(fig:xxxx) with xxxx being the label
-in the code chunk that also gives the filename of the figure. This name must be unique
---->
+We first look for different types of samples: tumor and normal.
 
 ```{r libsizes, echo=FALSE, fig.cap="Library sizes in increasing order."}
 ord <- order(dge$sample$lib.size/1e6)
@@ -119,31 +96,19 @@ barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads",
 legend("topleft", c("tumor", "normal"), fill=c("blue", "red"), inset=0.01)
 ```
 
-Tumor samples: 513
-Normal samples: 59
+- Tumor samples: 513
 
-As we can see in this plot, we have too more reads from tumor than normal one with similar depth.
-This figure reveals substantial differences in sequencing depth between samples
-and we may consider discarding those samples whose depth is substantially lower
-than the rest. To identify who are these samples we may simply look at the
-actual numbers including portion of the sample identifier that distinguishes them.
+- Normal samples: 59
 
-**GENDER**
-As we have NA values in the gender of several samples of the dataset, so we need first to remove those values in order to differenciate male/female.
+As we can observe in this plot, we have too more samples from tumor than normal one with 
+similar sequence depth. This figure also reveals substantial differences in sequencing depth between 
+samples and we may consider discarding those samples whose depth is substantially lower
+than the rest.
 
-##LOOOK
-
-```{r libsizes, echo=FALSE, fig.cap="Library sizes in increasing order."}
-ord <- order(dge$sample$lib.size/1e6)
-barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads",
-                xlab="Samples", col=c("red", "blue")[(thca$gender[ord])], border = NA)
-legend("topleft", c("male", "female"), fill=c("blue", "red"), inset=0.01)
-```
-We have 140 samples from male, and 406 samples of female.
 
 **Sample Depth**
 
-We want to remove those genes which less than 40 of sequencing depth.
+As we have seen differences of depth, we want to remove those samples with less than 40 of sequencing depth.
 
 ```{r}
 sampledepth <- round(dge$sample$lib.size / 1e6, digits=1)
@@ -151,7 +116,10 @@ names(sampledepth) <- substr(colnames(thca), 6, 12)
 sort(sampledepth)
 ```
 
-Now we can filter the data set by sample depth and NA values in gender.
+
+Looking for the gender distribution of the samples, we observe that there are 140 samples from male, 406 samples of female and several samples without known gender. We may later analyze the differences between males and females,as we known that thyroid carcinoma affects more to women than men, we are going to remove those samples with NA value in gender.
+
+We apply two filter: one for the sample depth and other for the gender.
 
 ```{r}
 maskd <- sampledepth > 40 #sample depth filter
@@ -162,18 +130,13 @@ dge.filt <- dge[maskd,maskg]
 dim(thca.filt)
 ```
 
+With that filter, we have decreasing our data size in 16948 genes and 555 samples.
+
 ## Distribution of expression levels among samples
 
 Let's look at the distribution of expression values per sample in terms of
 logarithmic CPM units. Due to the large number of samples, we display tumor
 and normal samples separately, and are shown in Figure \@ref(fig:distRawExp)
-
-<!---
-the option echo=FALSE hides the R code. When plotting in general one does not
-want to see the code. Options fig.height and fig.width control height and width
-of the plot in inches while out.height and out.width do it in the final output
-file; see http://yihui.name/knitr/options for full details.
---->
 
 ```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample.", message=FALSE}
 library(geneplotter)
@@ -184,45 +147,36 @@ multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "normal"
                           xlab="log 2 CPM", legend=NULL, main="Normal samples", las=1)
 ```
 
-*Explanation*
+From this plots, we can observe that all samples follow a similar pattern with a lot of genes very expressed and many other lowly expressed.
+We can also observe few samples that deviate a little bit around -5:0 log2CPM in tumor types, but it is not very noticeable. Moreover, There is no sample with a clearly evidence of being wrong.
 
-*GENDER*
+We also perform a box plot of the expression values per sample, to have another visual way to interpret the data, because samples can have different interquartiles range (spot locations differences).
 
-Now, we also perform the multidensity plots between males and females, to know if there is a difference between them.
-
-```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample.", message=FALSE}
-library(geneplotter)
-par(mfrow=c(1, 2))
-multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$gender == "FEMALE"])$logCPM)),
-                          xlab="log 2 CPM", legend=NULL, main="Female samples", las=1)
-multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$gender == "MALE"])$logCPM)),
-                          xlab="log 2 CPM", legend=NULL, main="Male samples", las=1)
+```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Box plot of the distribution expression values across samples", message=FALSE}
+boxplot(assays(thca.filt)$logCPM, col = "gray", xlab = "Samples", ylab = expression(log[2] * "CPM"), cex.axis = 1.2, cex.lab = 1.5, las = 1)
 ```
 
-```{r}
-boxplot(assays(thca.filt)$logCPM, col = "gray", xlab = "Samples", ylab = expression(log[2] *
-"CPM"), cex.axis = 1.2, cex.lab = 1.5, las = 1)
-```
-*Explanation*
-
+We can observe in that plot, that there is few samples which deviate a little bit of the average, but they are not very noticeable.
+After the normalization, we have to look for those samples and observe if they are still deviate in order to remove them.
 ## Distribution of expression levels among genes
 
-Let's calculate now the average expression per gene through all the samples.
+Let's calculate now the average expression per gene through all the samples. 
 Figure \@ref(fig:exprdist) shows the distribution of those values across genes.
 
 ```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Distribution of average expression level per gene."}
 avgexp <- rowMeans(assays(thca.filt)$logCPM)
 hist(avgexp, xlab="log2 CPM", main="", las=1, col = "blue")
-abline(v=1, col="red", lwd=2)
+abline(v=0, col="red", lwd=2)
 ```
+
+We observe, that the most part of the genes have at least a log2CPM greater than 0, and we want to remove those one lowly expressed.
 
 ## Filtering of lowly-expressed genes
 
-In the light of this plot, we may consider a cutoff of 1 log CPM unit as minimum value
-of expression to select genes being expressed across samples. Using this cutoff we proceed
-to filter out lowly-expressed genes.
+First, we are going to filter out genes with fewer than a given number of samples meeting a minimum log2CPM cutoff, with the following code and visualize it with an histogram.
 
 ```{r}
+#explicar una miqueta
 cpmcutoff <- round(10/min(dge.filt$sample$lib.size/1e+06), digits = 1)
 cpmcutoff
 nsamplescutoff <- min(table(thca.filt$gender))
@@ -242,6 +196,7 @@ lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
 
+In this histogram, we observe those genes that have passed the cutoff, but the first two red columns are not very representative of the group, and as we have a lot of genes to perform the analysis, we are going to remove them with filtering genes out below a minimum average CPM (or CPM) value throughout the samples. To remove them, we need to choose a cutoff of 4 log2 CPM unit as minimum value of expression.
 
 ```{r}
 mask <- avgexp > 4
@@ -252,8 +207,6 @@ dge.filt3 <- dge.filt[mask, ]
 dim(dge.filt3)
 ```
 
-Visualize the filtered genes
-
 ```{r}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
@@ -262,7 +215,8 @@ x <- cut(rowMeans(assays(thca.filt3)$logCPM), breaks = h$breaks)
 lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
-We have performed both types of filtering, we get the second filtering as it is more strict.
+
+After filtering the dataset with both methods, we have finally 6654 genes to analyzed the differential expression.
 
 Store un-normalized versions of the filtered expression data.
 
@@ -296,18 +250,8 @@ saveRDS(dge.filt3, file.path("./", "dge.filt.rds"))
 
 ## MA-plots
 
-We examine now the MA-plots of the normalized expression profiles. We look first to
-the tumor samples in Figure \@ref(fig:maPlotsTumor).
+We first examine a global MA-plot, to have a general idea of the normalized data and non-normalized
 
-<!---
-Here we make a MA-plot for each sample. The options 'fig.height' and 'fig.width'
-control the relative image size in *inches*. The final image size results from
-'height'x'dpi' and 'width'x'dpi', where 'dpi' is the image resolution in
-"dots per inch" (by default dpi=72). To scale the image to a desired size use
-'out.width' and 'out.height'. More information at http://yihui.name/knitr/options
---->
-
-We first perform a global MA plot, to have a general idea of the data filtered and non-filtered
 ```{r}
 dge$samples$group <- thca$type
 table(dge$samples$gorup)
@@ -318,7 +262,11 @@ plotSmear(dge.filt3, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
 abline(h = 0, col = "blue", lwd = 2)
 ```
 
-We visualize MA plot for each gene in tumor/normal types
+We remove the lowly expressed genes to avoid artifacts in the posterior analysis. In the normalized plot, we observe a smother shape with less outliers. 
+
+We examine now the MA-plots of the normalized expression profiles for each tumor and normal samle sparately. We look first to
+the tumor samples in Figure \@ref(fig:maPlotsTumor).
+
 ```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="MA-plots of the tumor samples."}
 par(mfrow=c(22, 3), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "tumor"]
@@ -352,13 +300,17 @@ for (i in 1:ncol(setmp)) {
 }
 ```
 
-We make a filtering between samples
+#Nos plantemaos elimnar samples mal distribuidos o hacer filtering between samples
 
+We can perform a MDS plot (which is a tailored PCA) in order to visualize possibles clusters.
 ```{r}
 plotMDS(dge.filt3, col = c("red", "blue")[as.integer(dge.filt3$samples$group)], cex = 0.7)
 legend("topleft", c("normal", "tumor"), fill = c("red", "blue"), inset = 0.05, cex = 0.7)
 ```
-Tumors near red points, they don't have the same mutations, and they also are not so aggresive.
+
+We observe that there is a difference between normal and tummor samples. We have to test if this cluster is due to the type tissue or because any batch that confound our interest outcome, in order to continue with further analyses
+
+*Tumors near red points, they don't have the same mutations, and they also are not so aggresive.*
 
 *Normalization between Samples* LOOK
 ```{r}
@@ -556,7 +508,9 @@ legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial)
 ```
 
 From this hierchical clustering plot, we can observe that there is a different cluster depending 
-of the samplevial we use, so they can confounding with the interest outcome we want.
+of the samplevial we use, so they can confounding with the interest outcome we want. For that reason,
+we are going to adjust or remove this batch in order to get a non-biased results.
+
 ```{r mdsPlot, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S11: Multidimensional scaling plot of the samples."}
 plotMDS(dge.filt, labels=outcome, col=batch)
 legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(samplevial))),

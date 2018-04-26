@@ -33,6 +33,7 @@ dge.filt <- readRDS(file.path("./", "dge.filt.rds"))
 
 # Differential expression
 
+As we have seen that samplevial can procude a confunding outcome, we are going to analyze this effect.
 We perform a simple examination of expression changes and their associated p-values
 using the R/Bioconductor package [sva](http://bioconductor.org/packages/sva).
 
