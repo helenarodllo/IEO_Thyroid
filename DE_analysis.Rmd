@@ -37,24 +37,77 @@ We perform a simple examination of expression changes and their associated p-val
 using the R/Bioconductor package [sva](http://bioconductor.org/packages/sva).
 
 ```{r}
-tss <- substr(colnames(thca.filt), 6, 7)
-table(tss)
-center <- substr(colnames(thca.filt), 27, 28)
-table(center)
-plate <- substr(colnames(thca.filt), 22, 25)
-table(plate)
-portionanalyte <- substr(colnames(thca.filt), 18, 20)
-table(portionanalyte)
 samplevial <- substr(colnames(thca.filt), 14, 16)
-table(samplevial)
+colData(thca.filt)$samplevial <- samplevial
+batch <- as.integer(factor(samplevial))
+mod <- model.matrix(~type + samplevial, data = colData(thca.filt))
+logCPM <- cpm(dge.filt, log = TRUE, prior.count = 3)
 ```
 
-```{r, message=FALSE}
+##Adjusting Batch Effect: SVA
+
+```{r}
 library(sva)
-mod <- model.matrix(~ thca.filt$type, data = colData(thca.filt))
-mod0 <- model.matrix(~ 1, data = colData(thca.filt))
-pv <- f.pvalue(logCPM, mod, mod0)
+mod0 <- model.matrix(~samplevial, data = colData(thca.filt))
+head(mod0)
+pv <- f.pvalue(assays(thca.filt)$logCPM, mod, mod0)
 sum(p.adjust(pv, method="fdr") < 0.01)
+```
+
+##Removing Batch Effect: QRDecomposition
+
+```{r}
+library(limma)
+qrexp <- removeBatchEffect(logCPM, batch, design = mod)
+class(qrexp)
+dim(qrexp)
+
+d <- as.dist(1 - cor(qrexp, method = "spearman"))
+sampleClustering <- hclust(d)
+sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
+names(batch) <- colnames(thca.filt)
+outcome <- as.character(thca.filt$type)
+names(outcome) <- colnames(thca.filt)
+sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
+## for every node in the dendrogram if it is a leaf node
+if (is.leaf(x)) {
+attr(x, "nodePar") <- list(lab.col = as.vector(batch[attr(x, "label")])) ## color by batch
+attr(x, "label") <- as.vector(labels[attr(x, "label")]) ## label by outcome
+}
+x
+}, batch, outcome) ## these are the second and third arguments in the function
+plot(sampleDendrogram, main = "Hierarchical clustering of samples")
+legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
+```
+
+We can see that this method has no a good remove of the batch effect
+
+##Removing Batch Effect: SVD
+```{r, message=FALSE}
+library(corpcor)
+s <- fast.svd(t(scale(t(logCPM), center = TRUE, scale = TRUE)))
+pcSds <- s$d
+pcSds[1] <- 0
+svdexp <- s$u %*% diag(pcSds) %*% t(s$v)
+colnames(svdexp) <- colnames(thca.filt)
+class(svdexp)
+dim(svdexp)
+d <- as.dist(1 - cor(svdexp, method = "spearman"))
+sampleClustering <- hclust(d)
+sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
+names(batch) <- colnames(thca.filt)
+outcome <- as.character(thca.filt$type)
+names(outcome) <- colnames(thca.filt)
+sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
+## for every node in the dendrogram if it is a leaf node
+if (is.leaf(x)) {
+attr(x, "nodePar") <- list(lab.col = as.vector(batch[attr(x, "label")])) ## color by batch
+attr(x, "label") <- as.vector(labels[attr(x, "label")]) ## label by outcome
+}
+x
+}, batch, outcome) ## these are the second and third arguments in the function
+plot(sampleDendrogram, main = "Hierarchical clustering of samples")
+legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
 ```
 
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly

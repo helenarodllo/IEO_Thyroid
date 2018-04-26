@@ -62,6 +62,7 @@ variables, and their corresponding metadata.
 dim(colData(thca))
 colData(thca)[1:5, 1:5]
 mcols(colData(thca), use.names=TRUE)
+metadata(thca)
 ```
 
 These metadata consists of two columns of information about the clinical variables.
@@ -117,42 +118,47 @@ barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads",
                 xlab="Samples", col=c("red", "blue")[(thca$type[ord] == "tumor") + 1], border = NA)
 legend("topleft", c("tumor", "normal"), fill=c("blue", "red"), inset=0.01)
 ```
+
 Tumor samples: 513
 Normal samples: 59
 
+As we can see in this plot, we have too more reads from tumor than normal one with similar depth.
 This figure reveals substantial differences in sequencing depth between samples
 and we may consider discarding those samples whose depth is substantially lower
 than the rest. To identify who are these samples we may simply look at the
 actual numbers including portion of the sample identifier that distinguishes them.
 
 **GENDER**
-As we have NA values in several samples of the dataset, we need first to remove those values in order to differenciate male/female
+As we have NA values in the gender of several samples of the dataset, so we need first to remove those values in order to differenciate male/female.
 
 ##LOOOK
 
 ```{r libsizes, echo=FALSE, fig.cap="Library sizes in increasing order."}
-#maskg <- thca$gender != NA
-#dim(thca)
-#thca.filt <- thca[,maskg]
-#dim(thca.filt)
 ord <- order(dge$sample$lib.size/1e6)
 barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads",
                 xlab="Samples", col=c("red", "blue")[(thca$gender[ord])], border = NA)
 legend("topleft", c("male", "female"), fill=c("blue", "red"), inset=0.01)
 ```
+We have 140 samples from male, and 406 samples of female.
 
 **Sample Depth**
 
-We want to remove those genes which less than 30 of sequencing depth. *HOW TO DO IT?*
+We want to remove those genes which less than 40 of sequencing depth.
 
 ```{r}
 sampledepth <- round(dge$sample$lib.size / 1e6, digits=1)
 names(sampledepth) <- substr(colnames(thca), 6, 12)
 sort(sampledepth)
+```
+
+Now we can filter the data set by sample depth and NA values in gender.
+
+```{r}
+maskd <- sampledepth > 40 #sample depth filter
+maskg <- !is.na(thca$gender) #gender filter
 dim(thca)
-#Conditon filtering
-maskd <- sampledepth > 30
-thca.filt <- thca[maskd,]
+thca.filt <- thca[maskd,maskg]
+dge.filt <- dge[maskd,maskg]
 dim(thca.filt)
 ```
 
@@ -172,24 +178,32 @@ file; see http://yihui.name/knitr/options for full details.
 ```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample.", message=FALSE}
 library(geneplotter)
 par(mfrow=c(1, 2))
-multidensity(as.list(as.data.frame(assays(thca[, thca$type == "tumor"])$logCPM)),
+multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "tumor"])$logCPM)),
                           xlab="log 2 CPM", legend=NULL, main="Tumor samples", las=1)
-multidensity(as.list(as.data.frame(assays(thca[, thca$type == "normal"])$logCPM)),
+multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "normal"])$logCPM)),
                           xlab="log 2 CPM", legend=NULL, main="Normal samples", las=1)
 ```
 
-We do not appreciate substantial differences between the samples in the
-distribution of expression values.
+*Explanation*
 
-*GENDER* (remove NAs)
+*GENDER*
+
+Now, we also perform the multidensity plots between males and females, to know if there is a difference between them.
+
 ```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample.", message=FALSE}
 library(geneplotter)
 par(mfrow=c(1, 2))
-multidensity(as.list(as.data.frame(assays(thca[, thca$gender == "female"])$logCPM)),
+multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$gender == "FEMALE"])$logCPM)),
                           xlab="log 2 CPM", legend=NULL, main="Female samples", las=1)
-multidensity(as.list(as.data.frame(assays(thca[, thca$gender == "male"])$logCPM)),
+multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$gender == "MALE"])$logCPM)),
                           xlab="log 2 CPM", legend=NULL, main="Male samples", las=1)
 ```
+
+```{r}
+boxplot(assays(thca.filt)$logCPM, col = "gray", xlab = "Samples", ylab = expression(log[2] *
+"CPM"), cex.axis = 1.2, cex.lab = 1.5, las = 1)
+```
+*Explanation*
 
 ## Distribution of expression levels among genes
 
@@ -197,7 +211,7 @@ Let's calculate now the average expression per gene through all the samples.
 Figure \@ref(fig:exprdist) shows the distribution of those values across genes.
 
 ```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Distribution of average expression level per gene."}
-avgexp <- rowMeans(assays(thca)$logCPM)
+avgexp <- rowMeans(assays(thca.filt)$logCPM)
 hist(avgexp, xlab="log2 CPM", main="", las=1, col = "blue")
 abline(v=1, col="red", lwd=2)
 ```
@@ -209,28 +223,52 @@ of expression to select genes being expressed across samples. Using this cutoff 
 to filter out lowly-expressed genes.
 
 ```{r}
-mask <- avgexp > 1
-dim(thca)
-thca.filt <- thca[mask, ]
-dim(thca.filt)
-dge.filt <- dge[mask, ]
-dim(dge.filt)
+cpmcutoff <- round(10/min(dge.filt$sample$lib.size/1e+06), digits = 1)
+cpmcutoff
+nsamplescutoff <- min(table(thca.filt$gender))
+nsamplescutoff
+mask <- rowSums(cpm(dge.filt) > cpmcutoff) >= nsamplescutoff
+thca.filt2 <- thca.filt[mask, ]
+dge.filt2 <- dge.filt[mask, ]
+dim(thca.filt2)
 ```
+
+```{r}
+par(mar = c(4, 5, 1, 1))
+h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
+las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
+x <- cut(rowMeans(assays(thca.filt2)$logCPM), breaks = h$breaks)
+lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
+legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
+```
+
+
+```{r}
+mask <- avgexp > 4
+dim(thca.filt2)
+thca.filt3 <- thca.filt[mask, ]
+dim(thca.filt3)
+dge.filt3 <- dge.filt[mask, ]
+dim(dge.filt3)
+```
+
 Visualize the filtered genes
 
 ```{r}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
 las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
-x <- cut(rowMeans(assays(thca.filt)$logCPM), breaks = h$breaks)
+x <- cut(rowMeans(assays(thca.filt3)$logCPM), breaks = h$breaks)
 lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
+We have performed both types of filtering, we get the second filtering as it is more strict.
+
 Store un-normalized versions of the filtered expression data.
 
 ```{r}
-saveRDS(thca.filt, file.path("./", "thca.filt.unnorm.rds"))
-saveRDS(dge.filt, file.path("./", "dge.filt.unnorm.rds"))
+saveRDS(thca.filt3, file.path("./", "thca.filt.unnorm.rds"))
+saveRDS(dge.filt3, file.path("./", "dge.filt.unnorm.rds"))
 ```
 
 ## Normalization
@@ -238,21 +276,22 @@ saveRDS(dge.filt, file.path("./", "dge.filt.unnorm.rds"))
 We calculate now the normalization factors on the filtered expression data set.
 
 ```{r}
-dge.filt <- calcNormFactors(dge.filt)
+dge.filt3 <- calcNormFactors(dge.filt3)
+head(dge.filt3$samples$norm.factors)
 ```
 
 Replace the raw log2 CPM units in the corresponding assay element of the `SummarizedExperiment`
 object, by the normalized ones.
 
 ```{r}
-assays(thca.filt)$logCPM <- cpm(dge.filt, log=TRUE, normalized.lib.sizes=TRUE, prior.count=0.25)
+assays(thca.filt3)$logCPM <- cpm(dge.filt3, log=TRUE, normalized.lib.sizes=TRUE, prior.count=0.25)
 ```
 
 Store normalized versions of the filtered expression data.
 
 ```{r}
-saveRDS(thca.filt, file.path("./", "thca.filt.rds"))
-saveRDS(dge.filt, file.path("./", "dge.filt.rds"))
+saveRDS(thca.filt3, file.path("./", "thca.filt.rds"))
+saveRDS(dge.filt3, file.path("./", "dge.filt.rds"))
 ```
 
 ## MA-plots
@@ -272,18 +311,18 @@ We first perform a global MA plot, to have a general idea of the data filtered a
 ```{r}
 dge$samples$group <- thca$type
 table(dge$samples$gorup)
-dge.filt$samples$group <- thca$type
+dge.filt3$samples$group <- thca.filt3$type
 plotSmear(dge, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
 abline(h = 0, col = "blue", lwd = 2)
-plotSmear(dge.filt, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
+plotSmear(dge.filt3, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
 abline(h = 0, col = "blue", lwd = 2)
 ```
 
 We visualize MA plot for each gene in tumor/normal types
 ```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="MA-plots of the tumor samples."}
 par(mfrow=c(22, 3), mar=c(4, 5, 3, 1))
-setmp <- thca.filt[, thca.filt$type == "tumor"]
-dgetmp <- dge.filt[, thca.filt$type == "tumor"]
+setmp <- thca.filt3[, thca.filt3$type == "tumor"]
+dgetmp <- dge.filt3[, thca.filt3$type == "tumor"]
 for (i in 1:ncol(setmp)) {
   A <- rowMeans(assays(setmp)$logCPM)
   M <- assays(setmp)$logCPM[, i] - A
@@ -300,8 +339,8 @@ look now to the normal samples in Figure \@ref(fig:maPlotsNormal).
 
 ```{r maPlotsNormal, fig.height=18, fig.width=6, dpi=100, echo=FALSE, fig.cap="MA-plots of the normal samples."}
 par(mfrow=c(9, 3), mar=c(4, 5, 3, 1))
-setmp <- thca.filt[, thca.filt$type == "normal"]
-dgetmp <- dge.filt[, thca$type == "normal"]
+setmp <- thca.filt3[, thca.filt3$type == "normal"]
+dgetmp <- dge.filt3[, thca.filt3$type == "normal"]
 for (i in 1:ncol(setmp)) {
   A <- rowMeans(assays(setmp)$logCPM)
   M <- assays(setmp)$logCPM[, i] - A
@@ -316,7 +355,7 @@ for (i in 1:ncol(setmp)) {
 We make a filtering between samples
 
 ```{r}
-plotMDS(dge.filt, col = c("red", "blue")[as.integer(dge.filt$samples$group)], cex = 0.7)
+plotMDS(dge.filt3, col = c("red", "blue")[as.integer(dge.filt3$samples$group)], cex = 0.7)
 legend("topleft", c("normal", "tumor"), fill = c("red", "blue"), inset = 0.05, cex = 0.7)
 ```
 
