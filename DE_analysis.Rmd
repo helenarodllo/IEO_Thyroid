@@ -37,11 +37,21 @@ As we have seen that samplevial can procude a confunding outcome, we are going t
 We perform a simple examination of expression changes and their associated p-values
 using the R/Bioconductor package [sva](http://bioconductor.org/packages/sva).
 
+#lo que esta mal es la adiccion del sample vial a la tabla 
 ```{r}
-samplevial <- substr(colnames(thca.filt), 14, 16)
-colData(thca.filt)$samplevial <- samplevial
+#names <- colnames(thca.filt)
+#samplevial <- factor(substr(colnames(thca.filt), 14, 16), levels = substr(colnames(thca.filt), 14, 16), labels = colnames(thca.filt))
+#factor(c(samplevial), levels = c("01A", "01B", "11C", "11B", "11A"))
+#cbind(colData(thca.filt)$samplevial, samplevial)
+maskb <- substr(colnames(thca.filt), 14, 16) != c("01B", "11C", "11B")
+thca.filt.batch <- thca.filt[,maskb]
+dge.filt.batch <- dge.filt[,maskb]
+samplevial <- matrix(substr(colnames(thca.filt.batch), 14, 16), ncol = 1)
+rownames(samplevial) <- colnames(thca.filt.batch)
+sp <- factor(samplevial, labels <- rownames(samplevial))
+thca.filt.batch$sp <- samplevial
 batch <- as.integer(factor(samplevial))
-mod <- model.matrix(~type + samplevial, data = colData(thca.filt))
+mod <- model.matrix(~colData(thca.filt.batch)$type + samplevial, data = colData(thca.filt.batch))mod
 logCPM <- cpm(dge.filt, log = TRUE, prior.count = 3)
 ```
 
@@ -49,7 +59,7 @@ logCPM <- cpm(dge.filt, log = TRUE, prior.count = 3)
 
 ```{r}
 library(sva)
-mod0 <- model.matrix(~samplevial, data = colData(thca.filt))
+mod0 <- model.matrix(~colData(thca.filt)$sp, data = colData(thca.filt))
 head(mod0)
 pv <- f.pvalue(assays(thca.filt)$logCPM, mod, mod0)
 sum(p.adjust(pv, method="fdr") < 0.01)

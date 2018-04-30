@@ -25,8 +25,7 @@ opts_chunk$set(cache=TRUE,
 
 ## Data import
 
-We start importing the raw table of counts.
-
+We start by importing the raw table of counts for the THCA as a SummarizedExperiment object.
 
 ```{r, message=FALSE}
 library(SummarizedExperiment)
@@ -45,7 +44,9 @@ mcols(colData(thca), use.names=TRUE)
 metadata(thca)
 ```
 
-These metadata consists of two columns of information about the clinical variables.
+We have 549 columns with different information about the samples.
+
+The metadata consists of two columns of information about the clinical variables.
 One called `labelDescription` contains a succint description of the variable, often
 not more self-explanatory than the variable name itself, and the other called
 'CDEID' corresponds to the so-called `Common Data Element (CDE)` identifier. This
@@ -53,7 +54,7 @@ identifier can be use in https://cdebrowser.nci.nih.gov to search for further
 information about the associated clinical variable using the `Advanced search`
 form and the `Public ID` attribute search.
 
-Those data are from the "Alternative preprocessing of RNA-Sequencing data in The Cancer Genome Atlas leads to improved analysis results" project, with 20115 analyzed genes and 572 samples. 
+The dataset is from the "Alternative preprocessing of RNA-Sequencing data in The Cancer Genome Atlas leads to improved analysis results" project, with 20115 analyzed genes and 572 samples. 
 
 Now, explore the row (feature) data.
 
@@ -62,7 +63,9 @@ rowData(thca)
 rowRanges(thca)
 ```
 
-To perform quality assessment and normalization we need first to load the
+We can observe the characteristics of the studied genes,as it location, ranges strand, symbol,length and CG content.
+
+Once we have take a look to the data we should perform quality assessment and normalization. For that, we need first to load the
 [edgeR](http://bioconductor.org/packages/edgeR) R/Bioconductor package and
 create a `DGEList' object.
 
@@ -87,28 +90,21 @@ In this part, we examine the sequencing depth in terms of total number of sequen
 mapped to the genome per sample. Figure \@ref(fig:libsizes) below shows the
 sequencing depth per sample, also known as library sizes, in increasing order.
 
-We first look for different types of samples: tumor and normal.
+We want to compare the differential expressed genes between tumor or normal sample, so we need to saparate those groups. Looking in the dataset we have 513 of tumor sample, whereas we only have 59 samples of normal thyroid.
 
-```{r libsizes, echo=FALSE, fig.cap="Library sizes in increasing order."}
+```{r libsizes, echo=FALSE, fig.cap="Fig1.Library sizes in increasing order."}
 ord <- order(dge$sample$lib.size/1e6)
 barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads",
                 xlab="Samples", col=c("red", "blue")[(thca$type[ord] == "tumor") + 1], border = NA)
 legend("topleft", c("tumor", "normal"), fill=c("blue", "red"), inset=0.01)
 ```
 
-- Tumor samples: 513
-
-- Normal samples: 59
-
-As we can observe in this plot, we have too more samples from tumor than normal one with 
-similar sequence depth. This figure also reveals substantial differences in sequencing depth between 
-samples and we may consider discarding those samples whose depth is substantially lower
-than the rest.
+As we can observe in this plot, we have too more samples from tumor than normal one, as we expect, with similar sequence depth between them. However, this figure also reveals substantial differences in sequencing depth between samples and we may consider discarding those samples whose depth is substantially lower than the rest.
 
 
 **Sample Depth**
 
-As we have seen differences of depth, we want to remove those samples with less than 40 of sequencing depth.
+As we have seen differences of sequencing depth in the previous plot, we want to remove those samples with a lower depth value. For that, we first calculate the sample depth as follows, and select a cutoff to remove samples.
 
 ```{r}
 sampledepth <- round(dge$sample$lib.size / 1e6, digits=1)
@@ -116,10 +112,13 @@ names(sampledepth) <- substr(colnames(thca), 6, 12)
 sort(sampledepth)
 ```
 
+Moreover, we know that this cancer has different affection depending on the gender, being women more susceptibles, so maybe we would like to compare samples regarding the gender. Looking for the gender distribution of the samples, we observe that there are 140 samples from male, 406 samples of female and several ones without known gender. For a previous analysis, we are going to remove those samples with NA value in gender.
 
-Looking for the gender distribution of the samples, we observe that there are 140 samples from male, 406 samples of female and several samples without known gender. We may later analyze the differences between males and females,as we known that thyroid carcinoma affects more to women than men, we are going to remove those samples with NA value in gender.
+That way, we apply two filters:
 
-We apply two filter: one for the sample depth and other for the gender.
+- Remove all sample with a sample depth lower than 40.
+
+- Remove samples without known gender.
 
 ```{r}
 maskd <- sampledepth > 40 #sample depth filter
@@ -130,15 +129,18 @@ dge.filt <- dge[maskd,maskg]
 dim(thca.filt)
 ```
 
-With that filter, we have decreasing our data size in 16948 genes and 555 samples.
+With this filter, we have a dataset of 16948 genes and 555 samples.
 
 ## Distribution of expression levels among samples
+
+One way to normalize RNA-seq data is an adjustment to compare across features 
+in a sample, that we can perform using count per million reads (CPM).
 
 Let's look at the distribution of expression values per sample in terms of
 logarithmic CPM units. Due to the large number of samples, we display tumor
 and normal samples separately, and are shown in Figure \@ref(fig:distRawExp)
 
-```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample.", message=FALSE}
+```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Fig2. Non-parametric density distribution of expression profiles per sample.", message=FALSE}
 library(geneplotter)
 par(mfrow=c(1, 2))
 multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "tumor"])$logCPM)),
@@ -148,38 +150,45 @@ multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "normal"
 ```
 
 From this plots, we can observe that all samples follow a similar pattern with a lot of genes very expressed and many other lowly expressed.
-We can also observe few samples that deviate a little bit around -5:0 log2CPM in tumor types, but it is not very noticeable. Moreover, There is no sample with a clearly evidence of being wrong.
+We can also observe few samples that deviate a little bit around -5:0 log2CPM in tumor types, but it is not very noticeable, so we are not going to discard those samples, because there is no clearly evidence of being wrong, and it is also in the lower expression zone.
 
 We also perform a box plot of the expression values per sample, to have another visual way to interpret the data, because samples can have different interquartiles range (spot locations differences).
 
-```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Box plot of the distribution expression values across samples", message=FALSE}
+```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Fig3. Box plot of the distribution expression values across samples", message=FALSE}
 boxplot(assays(thca.filt)$logCPM, col = "gray", xlab = "Samples", ylab = expression(log[2] * "CPM"), cex.axis = 1.2, cex.lab = 1.5, las = 1)
 ```
 
-We can observe in that plot, that there is few samples which deviate a little bit of the average, but they are not very noticeable.
-After the normalization, we have to look for those samples and observe if they are still deviate in order to remove them.
+In the blox plot, we can observe there is few samples which deviate a little bit of the average, but they are not very noticeable. After the normalization, we have to look for those samples and observe if they are still deviate in order to remove them.
+
 ## Distribution of expression levels among genes
 
-Let's calculate now the average expression per gene through all the samples. 
+Let's calculate now the average expression per gene through all the samples, in order to identify lowly expressed genes. 
 Figure \@ref(fig:exprdist) shows the distribution of those values across genes.
 
-```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Distribution of average expression level per gene."}
+```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig4. Distribution of average expression level per gene."}
 avgexp <- rowMeans(assays(thca.filt)$logCPM)
-hist(avgexp, xlab="log2 CPM", main="", las=1, col = "blue")
+hist(avgexp, xlab="log2 CPM", main="", las=1, col = "grey")
 abline(v=0, col="red", lwd=2)
 ```
 
-We observe, that the most part of the genes have at least a log2CPM greater than 0, and we want to remove those one lowly expressed.
+The most part of the genes have at least a log2CPM greater than 0, and we want to remove those one lowly expressed.
 
 ## Filtering of lowly-expressed genes
 
-First, we are going to filter out genes with fewer than a given number of samples meeting a minimum log2CPM cutoff, with the following code and visualize it with an histogram.
+We can fiter lowly-expreesed genes following two criteria:
+
+- Filter out genes below a minimum average log2CPM throught the samples.
+
+- Filter out genes with fewer than a given number of sample meeting a minimum log2CPM.
+
+First, we are going to filter out genes with the second approach, and visualize it with an histogram to know if we want also to perform the other filter.
 
 ```{r}
-#explicar una miqueta
+#calculate cpm cutoff around all samples
 cpmcutoff <- round(10/min(dge.filt$sample$lib.size/1e+06), digits = 1)
 cpmcutoff
-nsamplescutoff <- min(table(thca.filt$gender))
+#select number of samples meeting that cutoff
+nsamplescutoff <- min(table(thca.filt$type))
 nsamplescutoff
 mask <- rowSums(cpm(dge.filt) > cpmcutoff) >= nsamplescutoff
 thca.filt2 <- thca.filt[mask, ]
@@ -187,7 +196,7 @@ dge.filt2 <- dge.filt[mask, ]
 dim(thca.filt2)
 ```
 
-```{r}
+```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig5. Distribution of average expression level per gene with first filter."}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
 las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
@@ -196,7 +205,11 @@ lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
 
-In this histogram, we observe those genes that have passed the cutoff, but the first two red columns are not very representative of the group, and as we have a lot of genes to perform the analysis, we are going to remove them with filtering genes out below a minimum average CPM (or CPM) value throughout the samples. To remove them, we need to choose a cutoff of 4 log2 CPM unit as minimum value of expression.
+Now, we have a dataset of 7656 genes to analyzed.
+
+In this histogram, we have all genes that have passed the cutoff (red bars). However, we observe that the first red columns are not very representative of the group, and as we have a lot of genes to perform the analysis, we are going toapply a second filter. 
+
+To remove them, we choose a cutoff of 4 log2 CPM unit as minimum value of expression and visualize the fitered dataset with another histogram.
 
 ```{r}
 mask <- avgexp > 4
@@ -207,7 +220,7 @@ dge.filt3 <- dge.filt[mask, ]
 dim(dge.filt3)
 ```
 
-```{r}
+```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig6. Distribution of average expression level per gene with second filter."}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
 las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
@@ -216,7 +229,7 @@ lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
 
-After filtering the dataset with both methods, we have finally 6654 genes to analyzed the differential expression.
+After filtering the dataset with both methods, we have finally 6654 genes to perform a differential expression analysis.
 
 Store un-normalized versions of the filtered expression data.
 
@@ -234,8 +247,7 @@ dge.filt3 <- calcNormFactors(dge.filt3)
 head(dge.filt3$samples$norm.factors)
 ```
 
-Replace the raw log2 CPM units in the corresponding assay element of the `SummarizedExperiment`
-object, by the normalized ones.
+Replace the raw log2 CPM units in the corresponding assay element of the `SummarizedExperiment` object, by the normalized ones.
 
 ```{r}
 assays(thca.filt3)$logCPM <- cpm(dge.filt3, log=TRUE, normalized.lib.sizes=TRUE, prior.count=0.25)
@@ -250,9 +262,11 @@ saveRDS(dge.filt3, file.path("./", "dge.filt.rds"))
 
 ## MA-plots
 
-We first examine a global MA-plot, to have a general idea of the normalized data and non-normalized
+MA plots are used for detecting intensity dependent biases, by comparing two groups of the dataset,
 
-```{r}
+We first examine a global MA-plot for normalized and non-normalized data to have a general idea of the possible dependencies.
+
+```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig7. MA-plots of normalized and non-normalized data."}
 dge$samples$group <- thca$type
 table(dge$samples$gorup)
 dge.filt3$samples$group <- thca.filt3$type
@@ -262,12 +276,12 @@ plotSmear(dge.filt3, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
 abline(h = 0, col = "blue", lwd = 2)
 ```
 
-We remove the lowly expressed genes to avoid artifacts in the posterior analysis. In the normalized plot, we observe a smother shape with less outliers. 
+In the non-normalized plot, we observe there are a lot of genes non differential expreesion (logFC ~ 0) and also several ones with a a low log2CPM which are removed in the normalized plot to avoid artifacts in the posterior analysis. In the normalized plot, we also observe a smother shape with less outliers. 
 
-We examine now the MA-plots of the normalized expression profiles for each tumor and normal samle sparately. We look first to
+We examine now the MA-plots of the normalized expression profiles for each tumor and normal samle sparately, in order to observe if there is any sample with a anomalous expression profile. We look first to
 the tumor samples in Figure \@ref(fig:maPlotsTumor).
 
-```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="MA-plots of the tumor samples."}
+```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig8. MA-plots of the tumor samples."}
 par(mfrow=c(22, 3), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "tumor"]
 dgetmp <- dge.filt3[, thca.filt3$type == "tumor"]
@@ -285,7 +299,7 @@ for (i in 1:ncol(setmp)) {
 We do not observe samples with major expression-level dependent biases. Let's
 look now to the normal samples in Figure \@ref(fig:maPlotsNormal).
 
-```{r maPlotsNormal, fig.height=18, fig.width=6, dpi=100, echo=FALSE, fig.cap="MA-plots of the normal samples."}
+```{r maPlotsNormal, fig.height=18, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig9. MA-plots of the normal samples."}
 par(mfrow=c(9, 3), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "normal"]
 dgetmp <- dge.filt3[, thca.filt3$type == "normal"]
@@ -300,21 +314,32 @@ for (i in 1:ncol(setmp)) {
 }
 ```
 
-#Nos plantemaos elimnar samples mal distribuidos o hacer filtering between samples
+From normal samples, we can observe there is several with an anomalous profile, so we should remove those samples in order not to have biases in our results
 
-We can perform a MDS plot (which is a tailored PCA) in order to visualize possibles clusters.
 ```{r}
-plotMDS(dge.filt3, col = c("red", "blue")[as.integer(dge.filt3$samples$group)], cex = 0.7)
+#select more samples from tumor and normal
+maskbad <- substr(colnames(thca.filt3), 0, 12) %in% c("TCGA.BJ.A28W", "TCGA.BJ.A28X")
+dim(thca.filt3)
+dim(dge.filt3)
+thca.filt4 <- thca.filt3[, !maskbad]
+dge.filt4 <- dge.filt3[, !maskbad]
+dim(dge.filt4)
+```
+
+Once, we have done the normalization, we perform a MDS plot (which is a tailored PCA) in order to visualize possibles samples with distinctive features from the rest, which can idicate potential problem with samples.
+
+```{r}
+plotMDS(dge.filt3, col = c("red", "blue")[as.integer(dge.filt4$samples$group)], cex = 0.7)
 legend("topleft", c("normal", "tumor"), fill = c("red", "blue"), inset = 0.05, cex = 0.7)
 ```
 
-We observe that there is a difference between normal and tummor samples. We have to test if this cluster is due to the type tissue or because any batch that confound our interest outcome, in order to continue with further analyses
+We can observe two cluster, which indicate a difference between normal and tummor samples. We have to test if this cluster is due to the type tissue or because any batch that confound our interest outcome, in order to continue with further analyses.
 
-*Tumors near red points, they don't have the same mutations, and they also are not so aggresive.*
+Moreover, in normal samples zone we can also observe several tumor samples. If that cluster is because type sample, that can be explained becuse not all thyroid tumors have the same mutations, which produces different levels of severity in cancer patients.
 
 *Normalization between Samples* LOOK
 ```{r}
-m <- matrix(assays(thca.filt3)$counts, nrow=6654, ncol=555, byrow=TRUE)
+m <- matrix(assays(thca.filt4)$counts, nrow=6654, ncol=551, byrow=TRUE)
 dimnames(m) <- list(rownames(thca.filt3), colnames(thca.filt3))
 #floor(colMeans(m))
 #apply(m, 2, sd)
@@ -335,15 +360,15 @@ we are going to derive different elements of the TCGA barcode and examine their 
 across samples.
 
 ```{r}
-tss <- substr(colnames(thca.filt), 6, 7)
+tss <- substr(colnames(thca.filt4), 6, 7)
 table(tss)
-center <- substr(colnames(thca.filt), 27, 28)
+center <- substr(colnames(thca.filt4), 27, 28)
 table(center)
-plate <- substr(colnames(thca.filt), 22, 25)
+plate <- substr(colnames(thca.filt4), 22, 25)
 table(plate)
-portionanalyte <- substr(colnames(thca.filt), 18, 20)
+portionanalyte <- substr(colnames(thca.filt4), 18, 20)
 table(portionanalyte)
-samplevial <- substr(colnames(thca.filt), 14, 16)
+samplevial <- substr(colnames(thca.filt4), 14, 16)
 table(samplevial)
 ```
 
@@ -367,7 +392,7 @@ of interest as molecular changes between sample types, tumor vs. normal, we will
 the cross-classification of this outcome with TSS.
 
 ```{r}
-table(data.frame(TYPE=thca.filt3$type, TSS=tss))
+table(data.frame(TYPE=thca.filt4$type, TSS=tss))
 ```
 
 Observe that normal tissues from most of TSS are under-represented with respect to the tumor tissues. If TSS is a source of expression variability, this under-representation in the normal samples may lead to a potential confounding effect.
@@ -378,14 +403,14 @@ calculate again log CPM values with a higher prior count to moderate extreme fol
 produced by low counts. The resulting dendrogram is shown in Figure \@ref(fig:sampleClustering).
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S6: Hierarchical clustering of the samples."}
-logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(tss))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt3)
-outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
-names(outcome) <- colnames(thca.filt3)
+names(batch) <- colnames(thca.filt4)
+outcome <- paste(substr(colnames(thca.filt4), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt4)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -421,14 +446,14 @@ table(data.frame(TYPE=thca.filt3$type, plate=plate))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S8: Hierarchical clustering of the samples by Plate."}
-logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(plate))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt3)
-outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
-names(outcome) <- colnames(thca.filt3)
+names(batch) <- colnames(thca.filt4)
+outcome <- paste(substr(colnames(thca.filt4), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt4)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -454,14 +479,14 @@ table(data.frame(TYPE=thca.filt$type, PA=portionanalyte))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S10: Hierarchical clustering of the samples by Portion Analyuc."}
-logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(portionanalyte))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt3)
-outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
-names(outcome) <- colnames(thca.filt3)
+names(batch) <- colnames(thca.filt4)
+outcome <- paste(substr(colnames(thca.filt4), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt4)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
@@ -487,14 +512,14 @@ table(data.frame(TYPE=thca.filt$type, SV=samplevial))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S12: Hierarchical clustering of the samples by Portion Analyuc."}
-logCPM <- cpm(dge.filt3, log=TRUE, prior.count=3)
+logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
 batch <- as.integer(factor(samplevial))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt3)
-outcome <- paste(substr(colnames(thca.filt3), 9, 12), as.character(thca.filt3$type), sep="-")
-names(outcome) <- colnames(thca.filt3)
+names(batch) <- colnames(thca.filt4)
+outcome <- paste(substr(colnames(thca.filt4), 9, 12), as.character(thca.filt3$type), sep="-")
+names(outcome) <- colnames(thca.filt4)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
