@@ -356,7 +356,7 @@ Moreover, in normal samples zone we can also observe several tumor samples. If t
 *Normalization between Samples* LOOK
 ```{r}
 m <- matrix(assays(thca.filt4)$counts, nrow=6654, ncol=551, byrow=TRUE)
-dimnames(m) <- list(rownames(thca.filt3), colnames(thca.filt3))
+dimnames(m) <- list(rownames(thca.filt4), colnames(thca.filt4))
 #floor(colMeans(m))
 #apply(m, 2, sd)
 originalOrder <- apply(m, 2, order)
