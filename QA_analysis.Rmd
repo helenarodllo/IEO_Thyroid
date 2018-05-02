@@ -456,7 +456,7 @@ legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(tss))),
 
 *Plate*
 ```{r}
-table(data.frame(TYPE=thca.filt3$type, plate=plate))
+table(data.frame(TYPE=thca.filt4$type, plate=plate))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S8: Hierarchical clustering of the samples by Plate."}
@@ -489,7 +489,7 @@ legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(plate))),
 *PorrtionAnalyte*
 
 ```{r}
-table(data.frame(TYPE=thca.filt$type, PA=portionanalyte))
+table(data.frame(TYPE=thca.filt4$type, PA=portionanalyte))
 ```
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S10: Hierarchical clustering of the samples by Portion Analyuc."}
