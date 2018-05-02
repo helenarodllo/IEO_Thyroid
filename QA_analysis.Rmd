@@ -84,6 +84,20 @@ assays(thca)$logCPM <- cpm(dge, log=TRUE, prior.count=0.5)
 assays(thca)$logCPM[1:5, 1:5]
 ```
 
+## Important Variables
+
+In thyroid cancer we consider some variables more important than others as, according to bibliography, significant differences are seen in the categories of this variables related to thyroid cancer.
+
+We want to have a first look to this categories before the analysis of the whole data. This will give us an idea of the distribution of our data and can be useful in further analysis.
+
+```{r fig.height=8, fig.width=25}
+par(mfrow=c(2, 2))
+barplot(summary(colData(thca)$type))
+barplot(summary(colData(thca)$gender))
+barplot(summary(colData(thca)$ethnicity))
+barplot(summary(colData(thca)$age_at_diagnosis))
+```
+
 ## Sequencing depth
 
 In this part, we examine the sequencing depth in terms of total number of sequence read counts
