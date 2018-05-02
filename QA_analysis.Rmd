@@ -338,6 +338,8 @@ dim(dge.filt3)
 thca.filt4 <- thca.filt3[, !maskbad]
 dge.filt4 <- dge.filt3[, !maskbad]
 dim(dge.filt4)
+saveRDS(thca.filt4, file.path("./", "thca.filt4.rds"))
+saveRDS(dge.filt4, file.path("./", "dge.filt4.rds"))##better to use this one, no?
 ```
 
 Once, we have done the normalization, we perform a MDS plot (which is a tailored PCA) in order to visualize possibles samples with distinctive features from the rest, which can idicate potential problem with samples.
