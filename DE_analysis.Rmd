@@ -27,8 +27,8 @@ thca <- readRDS("seTHCA.rds")
 dge <- readRDS(file.path("./", "dge.rds"))
 thca.filt.unnorm <- readRDS(file.path("./", "thca.filt.unnorm.rds"))
 dge.filt.unnorm <- readRDS(file.path("./", "dge.filt.unnorm.rds"))
-thca.filt <- readRDS(file.path("./", "thca.filt.rds"))
-dge.filt <- readRDS(file.path("./", "dge.filt.rds"))
+thca.filt <- readRDS(file.path("./", "thca.filt4.rds"))
+dge.filt <- readRDS(file.path("./", "dge.filt4.rds"))
 ```
 
 # Differential expression
