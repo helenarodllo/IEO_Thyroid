@@ -61,7 +61,7 @@ This histogram shows that most of the genes have a p-value less than 0.1, so the
 Now, we svestimate surrogate variables using the `sva()` function.
 
 ```{r}
-assays(thca.filt)$logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
+assays(thca.filt)$logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 sv <- sva(assays(thca.filt)$logCPM, mod, mod0)
 sv$n
 names(sv)
@@ -97,7 +97,7 @@ batch <- as.integer(factor(samplevial))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
 names(batch) <- colnames(thca.filt)
 outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
-names(outcome) <- colnames(thca.filt4)
+names(outcome) <- colnames(thca.filt)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
                                  if (is.leaf(x)) {
