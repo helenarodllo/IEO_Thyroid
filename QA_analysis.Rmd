@@ -1,6 +1,6 @@
 ---
 title: "Thyroid carcinoma"
-author: "Lydia Fortea, Helena Rodriguez, Julia Mir"
+author: "Lydia Fortea, Helena Rodríguez, Júlia Mir"
 date: "25/4/2018"
 output: html_document
 ---
@@ -21,53 +21,39 @@ opts_chunk$set(cache=TRUE,
                comment="")
 ```
 
-# Quality assessment
+# Visualising data
 
-## Data import
+The data under study consists in counts of reads for the Thyroid carcinoma as a Summarized Experiment object \@ref(import). This dataset comes from the "Alternative preprocessing of RNA-Sequencing data in The Cancer Genome Atlas leads to improved analysis results" project, with 20115 analyzed genes and 572 samples.
 
-We start by importing the raw table of counts for the THCA as a SummarizedExperiment object.
+The column data contains pehnotypic data, which corresponds to clinical variables and their corresponding metadata \@ref(coldata), it contains 549 columns with different information about the samples.
+The metadata consists of two columns of information about the clinical variables. One called `labelDescription` contains a succint description of the variable, often
+not more self-explanatory than the variable name itself, and the other called 'CDEID' corresponds to the so-called `Common Data Element (CDE)` identifier. This
+identifier can be use in https://cdebrowser.nci.nih.gov to search for further information about the associated clinical variable using the `Advanced search`
+form and the `Public ID` attribute search.
 
-```{r, message=FALSE}
+The row data contains feature data \@ref(rowdata). We can observe the characteristics of the studied genes such as their location, ranges, strand, symbol, length and CG content.
+
+```{r import, message=FALSE}
 library(SummarizedExperiment)
 
 thca <- readRDS("../seTHCA.rds")
 thca
 ```
 
-Explore the column (phenotypic) data, which in this case corresponds to clinical
-variables, and their corresponding metadata.
-
-```{r}
+```{r coldata}
 dim(colData(thca))
 colData(thca)[1:5, 1:5]
 mcols(colData(thca), use.names=TRUE)
 metadata(thca)
 ```
 
-We have 549 columns with different information about the samples.
-
-The metadata consists of two columns of information about the clinical variables.
-One called `labelDescription` contains a succint description of the variable, often
-not more self-explanatory than the variable name itself, and the other called
-'CDEID' corresponds to the so-called `Common Data Element (CDE)` identifier. This
-identifier can be use in https://cdebrowser.nci.nih.gov to search for further
-information about the associated clinical variable using the `Advanced search`
-form and the `Public ID` attribute search.
-
-The dataset is from the "Alternative preprocessing of RNA-Sequencing data in The Cancer Genome Atlas leads to improved analysis results" project, with 20115 analyzed genes and 572 samples. 
-
-Now, explore the row (feature) data.
-
-```{r}
+```{r rowdata}
 rowData(thca)
 rowRanges(thca)
 ```
 
-We can observe the characteristics of the studied genes,as it location, ranges strand, symbol,length and CG content.
-
-Once we have take a look to the data we should perform quality assessment and normalization. For that, we need first to load the
-[edgeR](http://bioconductor.org/packages/edgeR) R/Bioconductor package and
-create a `DGEList' object.
+In this supplementary material we will perform a quality assessment and normalization of the data, in order to do that, we will create a 'DGEList' object. 
+In order to ease the manipulation of the data $\log_2$ CPM values of expression are calculated \@ref(logCPM).
 
 ```{r, message=FALSE}
 library(edgeR)
@@ -76,21 +62,19 @@ dge <- DGEList(counts=assays(thca)$counts, genes=mcols(thca))
 saveRDS(dge, file.path("./", "dge.rds"))
 ```
 
-Now calculate $\log_2$ CPM values of expression and put them as an additional
-assay element to ease their manipulation.
-
-```{r}
+```{r logCPM}
 assays(thca)$logCPM <- cpm(dge, log=TRUE, prior.count=0.5)
 assays(thca)$logCPM[1:5, 1:5]
 ```
 
+# Quality assessment
+
 ## Important Variables
 
 In thyroid cancer we consider some variables more important than others as, according to bibliography, significant differences are seen in the categories of this variables related to thyroid cancer.
+We want to have a first look to this categories before the analysis of the whole data. This will give us an idea of the distribution of our data and can be useful in further analysis \@ref(numvars).
 
-We want to have a first look to this categories before the analysis of the whole data. This will give us an idea of the distribution of our data and can be useful in further analysis.
-
-```{r fig.height=20, fig.width=20}
+```{r numvars, fig.height=20, fig.width=20}
 par(mfrow=c(3, 1))
 #Type
 tumor <- thca[ , colData(thca)$type == "tumor"]
@@ -114,11 +98,8 @@ A we can see, we have 513 tumors and 59 normal samples; or, lookig at the gender
 
 ## Sequencing depth
 
-In this part, we examine the sequencing depth in terms of total number of sequence read counts
-mapped to the genome per sample. Figure \@ref(fig:libsizes) below shows the
+In this part, we examine the sequencing depth in terms of total number of sequence read counts mapped to the genome per sample. Figure \@ref(libsizes) below shows the
 sequencing depth per sample, also known as library sizes, in increasing order.
-
-We want to compare the differential expressed genes between tumor or normal sample, so we need to saparate those groups. Looking in the dataset we have 513 of tumor sample, whereas we only have 59 samples of normal thyroid.
 
 ```{r libsizes, echo=FALSE, fig.cap="Fig1.Library sizes in increasing order."}
 ord <- order(dge$sample$lib.size/1e6)
@@ -127,28 +108,26 @@ barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads", main="Seq
 legend("topleft", c("tumor", "normal"), fill=c("skyblue", "chocolate1"), inset=0.01)
 ```
 
-As we can observe in this plot, we have too more samples from tumor than normal one, as we expect, with similar sequence depth between them. However, this figure also reveals substantial differences in sequencing depth between samples and we may consider discarding those samples whose depth is substantially lower than the rest.
-
+In this plot we can visually observe again that we have more samples from tumor than normal, both types have similar sequencing depth. However, the fugure also reveals substantial differences in sequencing depth between samples, this is why the discardation of those samples whose depth is substantially lower than the rest needs to be taked into consideration.
 
 **Sample Depth**
 
-As we have seen differences of sequencing depth in the previous plot, we want to remove those samples with a lower depth value. For that, we first calculate the sample depth as follows, and select a cutoff to remove samples.
+In order to remove those samples with a lower sequencing depth value, we first calculate the sample depth \@ref(smpdepth), and then select a cutoff to remove samples.
 
-```{r}
+```{r smpdepth}
 sampledepth <- round(dge$sample$lib.size / 1e6, digits=1)
 names(sampledepth) <- substr(colnames(thca), 6, 12)
 sort(sampledepth)
 ```
 
-Moreover, we know that this cancer has different affection depending on the gender, being women more susceptibles, so maybe we would like to compare samples regarding the gender. Looking for the gender distribution of the samples, we observe that there are 140 samples from male, 406 samples of female and several ones without known gender. For a previous analysis, we are going to remove those samples with NA value in gender.
+Moreover, we know that this cancer has different affection depending on the gender, being women more susceptibles, so maybe we would like to compare samples regarding the gender. Samples with unknown (NA) gender will be removed in order to allow further analysis.
 
-That way, we apply two filters:
+In conclusion, two filters are applied \@ref(maskdg):
 
 - Remove all sample with a sample depth lower than 40.
-
 - Remove samples without known gender.
 
-```{r}
+```{r maskdg}
 maskd <- sampledepth > 40 #sample depth filter
 maskg <- !is.na(thca$gender) #gender filter
 dim(thca)
@@ -157,9 +136,9 @@ dge.filt <- dge[,maskd&maskg]
 dim(thca.filt)
 ```
 
-With this filter, we have a dataset of 20115 genes and 467 samples. This way, none of our samples has a low sample depth. 
+Once the filters are applied, the dataset contains 20115 genes and 467 samples. This way, none of our samples has a low sample depth \@ref(filtlibsizes). 
 
-```{r libsizes, echo=FALSE, fig.cap="Fig1.Library sizes in increasing order."}
+```{r filtlibsizes, echo=FALSE, fig.cap="Fig1.Library sizes in increasing order."}
 ord <- order(dge.filt$sample$lib.size/1e6)
 barplot(dge.filt$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads", main="Sequencing depth",
                 xlab="Samples", col=c("chocolate1", "skyblue")[(thca.filt$type[ord] == "tumor") + 1], border = NA)
@@ -169,11 +148,8 @@ legend("topleft", c("tumor", "normal"), fill=c("skyblue", "chocolate1"), inset=0
 ## Distribution of expression levels among samples
 
 One way to normalize RNA-seq data is an adjustment to compare across features 
-in a sample, that we can perform using count per million reads (CPM).
-
-Let's look at the distribution of expression values per sample in terms of
-logarithmic CPM units. Due to the large number of samples, we display tumor
-and normal samples separately, and are shown in Figure \@ref(fig:distRawExp)
+in a sample, this can be performed using count per million reads (CPM). The distribution of expression values per samle in terms of logarithmic CPM units is ploted \@ref(distRawExp) separating by tumor and normal samples due to the large number of samples.
+A box plot of the expression values per samples is also performed \@ref(distboxplot) in order to have another visual way to interpret the data and spot location differences. 
 
 ```{r distRawExp, echo=FALSE, fig.height=4, fig.width=10, out.width="800px", fig.cap="Fig2. Non-parametric density distribution of expression profiles per sample.", message=FALSE}
 library(geneplotter)
@@ -184,20 +160,16 @@ multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "normal"
                           xlab="log 2 CPM", legend=NULL, main="Normal samples", las=1)
 ```
 
-From this plots, we can observe that all samples follow a similar pattern with a lot of genes very expressed and many other lowly expressed.
-
-We also perform a box plot of the expression values per sample, to have another visual way to interpret the data, because samples can have different interquartiles range (spot locations differences).
-
-```{r distRawExp, echo=FALSE, fig.height=4, fig.width=12, out.width="800px", fig.cap="Fig3. Box plot of the distribution expression values across samples", message=FALSE}
+```{r distboxplot, echo=FALSE, fig.height=4, fig.width=12, out.width="800px", fig.cap="Fig3. Box plot of the distribution expression values across samples", message=FALSE}
 boxplot(assays(thca.filt)$logCPM, col = "mediumseagreen", xlab = "Samples", ylab = expression(log[2] * "CPM"), cex.axis = 0.5, cex.lab = 1.5, las = 1, axes=F)
 ```
 
-In the blox plot, we can observe there are no samples that deviate a little bit of the average. For this reason, we assume that we do not need to normalise samples. 
+From this plots, it is observes that all samples follow a similar pattern with a group of highly expressed genes and another group of lowly expressed genes, following the common pattern of expression. From the box plot we can observe that there are no samples that deviate from the average interquartile range.
+For all this reasons, we assume that we do not need to normalise among samples.
 
 ## Distribution of expression levels among genes
 
-Let's calculate now the average expression per gene through all the samples, in order to identify lowly expressed genes. 
-Figure \@ref(fig:exprdist) shows the distribution of those values across genes.
+In order to identify lowly expressed genes, the average expression per gene through all samples is calculated. The distribution of thos values across genes is represented \@ref(exprdist).
 
 ```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig4. Distribution of average expression level per gene."}
 avgexp <- rowMeans(assays(thca.filt)$logCPM)
