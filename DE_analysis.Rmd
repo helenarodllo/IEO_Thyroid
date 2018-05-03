@@ -23,7 +23,7 @@ opts_chunk$set(cache=TRUE,
                fig.align="center",
                comment="")
 
-thca <- readRDS("../seTHCA.rds")
+thca <- readRDS("./seTHCA.rds")
 dge <- readRDS(file.path("./", "dge.rds"))
 thca.filt.unnorm <- readRDS(file.path("./", "thca.filt.unnorm.rds"))
 dge.filt.unnorm <- readRDS(file.path("./", "dge.filt.unnorm.rds"))
@@ -33,12 +33,11 @@ dge.filt <- readRDS(file.path("./", "dge.filt4.rds"))
 
 # Differential expression
 
-As we have seen that samplevial can procude a confunding outcome, we are going to analyze this effect.
-We perform a simple examination of expression changes and their associated p-values
-using the R/Bioconductor package [sva](http://bioconductor.org/packages/sva).
+As we have seen in batch identification, samplevial cluster our dataset into two groups which can be confunding with the interest outcome. As we have not enough sample size for each samplevial to adjust the data, we are going to perform a Surrogate Variable Analysis (SVA) in order to try to capture sources of heterogeneity, such as non-biological variability by batch effects.
 
-We first observa how many differential expressed genes do we have without any batch adjustment
+We perform a simple examination of expression changes and their associated p-values using the R/Bioconductor package [sva](http://bioconductor.org/packages/sva).
 
+First, we observe how many differential expressed genes do we have without any batch adjustment
 
 ```{r}
 library(sva)
@@ -46,19 +45,20 @@ mod <- model.matrix(~thca.filt$type, data = colData(thca.filt))
 mod0 <- model.matrix(~1, data = colData(thca.filt))
 pv <- f.pvalue(assays(thca.filt)$logCPM, mod, mod0)
 sum(p.adjust(pv, method="fdr") < 0.01)
+#thca.filt$pval <- p.adjust(pv, method="fdr") < 0.01
 ```
 
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
-their expression at FDR < 1%. In Figure \@ref(fig:pdist) below we show the distribution of the
-resulting p-values.
+their expression at FDR < 1%. In Figure \@ref(fig:pdist) below we show the distribution of the resulting p-values.
 We use FDR because can accept some false positives and be more laxe. 
 
 ```{r pdist, echo=FALSE, out.width="400px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
+hist(pv, main="Histogram before batch adjustment", las=1)
 ```
 
-Most of the genes have a p-value less than 0.1.
+This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as diferential expressed genes.
 
-Now, let's estimate surrogate variables using the `sva()` function.
+Now, we svestimate surrogate variables using the `sva()` function.
 
 ```{r}
 assays(thca.filt)$logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
@@ -67,8 +67,7 @@ sv$n
 names(sv)
 ```
 
-The SVA algorithm has found `r sv$n` surrogate variables. Let's use them to
-assess againt the extent of differential expression this time adjusting for these surrogate variables.
+The SVA algorithm has found `r sv$n` surrogate variables. That way, we are going to use them to assess againt the extent of differential expression this time adjusting for these surrogate variables.
 
 ```{r}
 modsv <- cbind(mod, sv$sv)
@@ -77,14 +76,16 @@ pvsv <- f.pvalue(assays(thca.filt)$logCPM, modsv, mod0sv)
 sum(p.adjust(pvsv, method="fdr") < 0.01)
 ```
 
-We have increased the number of changing genes to `r sum(p.adjust(pvsv, method="fdr") < 0.01)`.
+We have increased the number of changing genes to `r sum(p.adjust(pvsv, method="fdr") < 0.01)` with the batch adjustment for batch effects.
 Figure \@ref(fig:psvdist) shows the resulting distribution of p-values.
 
 ```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
-hist(pvsv, main="", las=1)
+hist(pvsv, main="Histogram after batch adjustment", las=1)
 ```
 
-Once we have applied the batch adjustment, we want to check with a hierarchical clustering if there is not biases in our dataset.
+In this histogram, we can observe there is more significant differential expressed genes with FDR less than 1%.
+
+Once we have applied the batch adjustment, we want to check of our detected batch is adjusted by performing a hierarchical clustering with that batch.
 
 ```{r}
 samplevial <- substr(colnames(thca.filt), 14, 16)
@@ -109,8 +110,9 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-##Removing Batch Effect: SVD
-```{r, message=FALSE}
+We observe that there is still the batch effect caused by samplevial, so we are going to remove this batch effect with an aggresive strategy called *Singular Value Decomposition (SVD)*. 
+
+```{r}
 library(corpcor)
 s <- fast.svd(t(scale(t(logCPM), center = TRUE, scale = TRUE)))
 pcSds <- s$d
@@ -119,6 +121,11 @@ svdexp <- s$u %*% diag(pcSds) %*% t(s$v)
 colnames(svdexp) <- colnames(thca.filt)
 class(svdexp)
 dim(svdexp)
+```
+
+Visualize the effect of the batch removing with a hiearchical clustering.
+
+```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S12: Hierarchical clustering of the samples by Portion Analyuc."}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleClustering <- hclust(d)
 sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
@@ -137,7 +144,40 @@ plot(sampleDendrogram, main = "Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
 ```
 
-VOLCANO PLOT
+Once, we have adjusted p-values according with batch effect, we want to obtain the truly DE genes
+
+```{r}
+tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
+norExp <- rowMeans(logCPM[, thca.filt$type == "normal"])
+log2fc <- norExp - tumExp
+ranking <- order(abs(log2fc), decreasing = TRUE)
+genes <- data.frame(LogFC = round(log2fc[ranking], digits = 3), PValue = round(pvsv, digits = 3), row.names = rowData(thca.filt)$symbol[ranking],
+check.names = FALSE)
+genes$FDRcutoff <- (1:nrow(gen) * 0.05)/nrow(gen)
+genes$FDRpval <- p.adjust(gen$PValue, method = "fdr")
+maskfdr <- gen$FDRpval < 0.01
+maskFC <- gen$LogFC < -2.5 | gen$LogFC > 2.5
+genes.fdr <- genes[maskfdr, ]
+genes.fc <- genes.fdr[maskFC, ]
+genes.fc
+```
+
+In this table, we can see all the obtained differential expressed genes (7503) with a adjust p-value with FDR lower than 1%. 
+
+We can plot raw p-values as function on their ranking, and drawing a line through the origin with slope α/m, provides a geometrical explanation for how FDR values are derived and why some of them are identical.
+
+```{r}
+alpha <- 0.01 ; plot(1:8, genes.fc$PValue[1:8], pch=19, xlab="Ranking", ylab="Raw p-value", las=1, main = "Plot of raw P-values")
+abline(a=0, b=alpha/nrow(genes.fc)) ; abline(v=sum(genes$PValue[1:8]-1:8*alpha/nrow(genes) < 0), lty=2)
+```
+
+We also can perform a *Volcano Plot*, widely used diagnostic
+plot in DE analysis, to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
+
+```{r}
+plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log fold-change", ylab="Raw p-value", las=1)
+abline(h=-log10(max(genes$PValue[genes$FDRpvalue <= 0.05])), lty=2)
+```
 
 ## Session information
 
