@@ -22,12 +22,11 @@ bibliography: bibliography.bib
 
 # Introduction
 
-Thyroid carcinoma (THCA) is the most common endocrine malignancy. It is thought that more than 60% of the population has thyroid nodules, but only a 8-16% of these will become malignant. Thus, TC only represents a 2.3% of all cancers worldwide, but its incidence is increasing.  
+Thyroid carcinoma (THCA) is the most common endocrine malignancy. It is thought that more than 60% of the population has thyroid nodules, but only a 8-16% of these will become malignant. Thus, TC only represents a 2.3% of all cancers worldwide, but its incidence is increasing (@1).  
 It affects more women than men. Some risks factors are the race (the histological type varies depending on the race), exposure to ionizing radiation, iodine deficiency, obesity, or environmental pollitants. There are some genetic risk factors too, like RET mutations, but not very common.  
 It has a high survial rate (more than 90% after five years), even if it decreases a lot when metastasis appear, specially if they are distant metastasis.  
 One of the current problems with THCA is that its diagnosis is not quite good: there is an overdiagnosis of clinically irrelevant tumors, and an underdiagnosis of the most aggressive tumours. One way to solve this problem would be by looking at differnetly expressed genes, which should be more different from non-tumoral tissue in the most aggressive carcinomas.  
-There are several types of THCA, but the most common come from follicuar cells and are well differentiated carcinomas, and most of them of the papillary sub-type. In fact, 80% of all THCA are papillary carcinomas, which are also the ones with best prognosis. These usually contain BRAF mutations, and are the less aggressive types. This is the kind of THCA we will focus on, since all TGCA data corresponds to this tumor type.  
-
+There are several types of THCA, but the most common come from follicuar cells and are well differentiated carcinomas, and most of them of the papillary sub-type. In fact, 80% of all THCA are papillary carcinomas, which are also the ones with best prognosis. These usually contain BRAF mutations, and are the less aggressive types. This is the kind of THCA we will focus on, since all TGCA data corresponds to this tumor type (@2).  
 
 The Cancer Genome Atlas (TCGA) has comprehensively profiled this type of cancer
 in a patient cohort. Here we analyze the expression profiles of those
@@ -42,7 +41,9 @@ style for Bioconductor vignettes facilitated by the Bioconductor package
 `r Biocpkg("BiocStyle")`. Please consult that package documentation, and particularly
 the [vignette](http://bioconductor.org/packages/release/bioc/vignettes/BiocStyle/inst/doc/AuthoringRmdVignettes.html)
 on "Authoring R Markdown vignettes", for full details on how to elaborate this
-kind of documents.
+kind of documents.  
+
+You also need some other packages, in order to run all the analysis. These are `r Biocpkg("SummarizedExperiment")`, `r Biocpkg("edgeR")`, `r Biocpkg("geneplotter")`, `r Biocpkg("sva")` and `r Biocpkg("corpcor")`.   
 
 The specific instructions to generate the final HTML report are written in a
 [Makefile](https://en.wikipedia.org/wiki/Makefile). To run it you just need to type
@@ -59,6 +60,10 @@ you should modify the `makefile`.
 The directory `results` will contain resulting files produced during the analysis,
 however, figures are going to end by default directories associated with the
 source filenames from where they were created.
+```{r, echo=F}
+dir.create("results")
+```
+
 
 ```{r echo=FALSE, results='asis'}
 cat(readLines("QAanalysis.knit.md"), sep="\n")
