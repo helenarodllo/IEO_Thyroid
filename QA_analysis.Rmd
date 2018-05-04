@@ -95,6 +95,7 @@ barplot(summary(colData(thca)$age_at_diagnosis),main="Patient's age", xlab="Age"
 ```
 The last "age" column correspond to NA, but we do not remove them in this plot because we may need those samples in further analysis. 
 A we can see, we have 513 tumors and 59 normal samples; or, lookig at the gender, 149 males and 406 females, with 17 samples from unknown gender. 
+The variable race has not been assessed, although it is considered important, because a big ammount of samples where not defined.
 
 ## Sequencing depth
 
@@ -177,19 +178,19 @@ hist(avgexp, xlab="log2 CPM", main="", las=1, col = "grey")
 abline(v=0, col="red", lwd=2)
 ```
 
-The most part of the genes have at least a log2CPM greater than 0, and we want to remove those one lowly expressed.
+Most of the genes have at least a log2CPM greater than 0, the ones that are lowly expressed are going to be removed.
 
 ## Filtering of lowly-expressed genes
 
-We can fiter lowly-expreesed genes following two criteria:
+Lowly-expressed genes can be filtered following two criteria:
 
-- Filter out genes below a minimum average log2CPM throught the samples.
+- Filtering out genes below a minimum average log2CPM throught the samples.
+- Filtering out genes with fewer than a given number of sample meeting a minimum log2CPM.
 
-- Filter out genes with fewer than a given number of sample meeting a minimum log2CPM.
+First of all, genes are filtered using the second approach \@ref(cpmcutoff). An histograme is plotted \@ref(expfilt1) in order to visualize the filtering and assess if the filtering is correct and enough.
+After the first filtering, the dataset consists of 15408 genes to analyzed. It is seen that many genes have not passed passed the cuttoff (red bars), so they are not filtered out. Also, first red columns are not really representative of the expression level group, so, in order to improve that issue, and taking into account that the number of genes to perform the analysis is enough, the application of a secondary filter is applied.
 
-First, we are going to filter out genes with the second approach, and visualize it with an histogram to know if we want also to perform the other filter.
-
-```{r}
+```{r cpmcutoff}
 #calculate cpm cutoff around all samples
 cpmcutoff <- round(10/min(dge.filt$sample$lib.size/1e+06), digits = 1)
 cpmcutoff
@@ -202,7 +203,7 @@ dge.filt2 <- dge.filt[mask, ]
 dim(thca.filt2)
 ```
 
-```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig5. Distribution of average expression level per gene with first filter."}
+```{r expfilt1, echo=FALSE, out.width="400px", fig.cap="Fig5. Distribution of average expression level per gene with first filter."}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
 las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
@@ -211,13 +212,9 @@ lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
 
-Now, we have a dataset of 15408 genes to analyzed.
+In order to perform a further filtering, a cuttoff of 3 log2CPM units is choosed as a minimum value of expression \@ref(cpmcutoff). Another histogram is shoun in order to visualize better the second filtering \@ref(expfilt2).
 
-In this histogram, we have all genes that have passed the cutoff (red bars). However, we observe that the first red columns are not very representative of the group, and as we have a lot of genes to perform the analysis, we are going toapply a second filter. 
-
-To remove them, we choose a cutoff of 3 log2 CPM unit as minimum value of expression and visualize the fitered dataset with another histogram.
-
-```{r}
+```{r cpmcutoff2}
 mask <- avgexp > 3
 dim(thca.filt2)
 thca.filt3 <- thca.filt[mask, ]
@@ -226,7 +223,7 @@ dge.filt3 <- dge.filt[mask, ]
 dim(dge.filt3)
 ```
 
-```{r exprdist, echo=FALSE, out.width="400px", fig.cap="Fig6. Distribution of average expression level per gene with second filter."}
+```{r expfilt2, echo=FALSE, out.width="400px", fig.cap="Fig6. Distribution of average expression level per gene with second filter."}
 par(mar = c(4, 5, 1, 1))
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), main = "",
 las = 1, col = "grey", cex.axis = 1.2, cex.lab = 1.5)
@@ -235,44 +232,36 @@ lines(h$mids, table(x), type = "h", lwd = 10, lend = 1, col = "darkred")
 legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred"))
 ```
 
-After filtering the dataset with both methods, we have finally 9423 genes to perform a differential expression analysis.
+After filtering the dataset with both methods, 9423 genes are left to perform a differential expression analysis.
 
-Store un-normalized versions of the filtered expression data.
-
-```{r}
+```{r unnorm}
 saveRDS(thca.filt3, file.path("./", "thca.filt.unnorm.rds"))
 saveRDS(dge.filt3, file.path("./", "dge.filt.unnorm.rds"))
 ```
 
 ## Normalization
 
-We calculate now the normalization factors on the filtered expression data set.
+After the filtering for lowly expressed genes, normalization factors need to be calculated in order to allow the detection of differential expression due to biology, not to sequencing depth.
 
-```{r}
+```{r normfact}
 dge.filt3 <- calcNormFactors(dge.filt3)
 head(dge.filt3$samples$norm.factors)
 ```
 
-Replace the raw log2 CPM units in the corresponding assay element of the `SummarizedExperiment` object, by the normalized ones.
-
-```{r}
+```{r normcpm}
 assays(thca.filt3)$logCPM <- cpm(dge.filt3, log=TRUE, normalized.lib.sizes=TRUE, prior.count=0.25)
 ```
 
-Store normalized versions of the filtered expression data.
-
-```{r}
+```{r norm}
 saveRDS(thca.filt3, file.path("./", "thca.filt.rds"))
 saveRDS(dge.filt3, file.path("./", "dge.filt.rds"))
 ```
 
 ## MA-plots
 
-MA plots are used for detecting intensity dependent biases, by comparing two groups of the dataset,
+MA plots are used to detect intensity dependent biases, by comparing two groups of the dataset. Firstly, a global MA-plot is examined for formalized and non-normalized data \@ref(maPlotsGeneral), this is done in order to have a general idea of possible dependencies.
 
-We first examine a global MA-plot for normalized and non-normalized data to have a general idea of the possible dependencies.
-
-```{r maPlotsTumor, fig.height=6, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig7. MA-plots of normalized and non-normalized data."}
+```{r maPlotsGeneral, fig.height=6, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig7. MA-plots of normalized and non-normalized data."}
 dge$samples$group <- thca$type
 table(dge$samples$gorup)
 dge.filt3$samples$group <- thca.filt3$type
@@ -282,10 +271,9 @@ plotSmear(dge.filt3, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2)
 abline(h = 0, col = "blue", lwd = 2)
 ```
 
-In the non-normalized plot, we observe there are a lot of genes non differential expreesion (logFC ~ 0) and also several ones with a a low log2CPM which are removed in the normalized plot to avoid artifacts in the posterior analysis. In the normalized plot, we also observe a smother shape with less outliers. 
+In the non-normalized plot, there are lots of genes non differential expreesed (logFC ~ 0) and also several ones with a low log2CPM. These ones are removed in the normalized plot in order to avoid artifacts in posterior analysis. In the normalized plot, a smother shape with less outliers is observed. 
 
-We examine now the MA-plots of the normalized expression profiles for each tumor and normal samples sparately, in order to observe if there is any sample with a anomalous expression profile. We look first to
-the tumor samples in Figure \@ref(fig:maPlotsTumor).
+MA-plots of the normalized expression profiles for each tumor \@ref(fig:maPlotsTumor) and normal \@ref(fig:maPlotsNormal) samples sparately are then examined, in order to observe if there is any sample with an anomalous expression profile. 
 
 ```{r maPlotsTumor, fig.height=36, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig8. MA-plots of the tumor samples."}
 par(mfrow=c(22, 3), mar=c(4, 5, 3, 1))
@@ -302,9 +290,6 @@ for (i in 1:ncol(setmp)) {
 }
 ```
 
-We do not observe samples with major expression-level dependent biases. Let's
-look now to the normal samples in Figure \@ref(fig:maPlotsNormal).
-
 ```{r maPlotsNormal, fig.height=18, fig.width=6, dpi=100, echo=FALSE, fig.cap="Fig9. MA-plots of the normal samples."}
 par(mfrow=c(9, 3), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "normal"]
@@ -320,9 +305,9 @@ for (i in 1:ncol(setmp)) {
 }
 ```
 
-From normal samples, we can observe there is several with an anomalous profile, so we should remove those samples in order not to have biases in our results
+Samples with major expresion-level dependent biasses are not observed in tumor samples. On the other hand, some samples from normal patients presenten an anomalous profile, this samples are removed \@ref(fig:biasses) in order to avoid biasses in the results. In total, 4 patients are removed, as one patitent (TCGA.BJ.A28X) has contributed with both, normal and tumor samples, at the end 5 samples are removed.
 
-```{r}
+```{r biasses}
 #select more samples from tumor and normal
 maskbad <- substr(colnames(thca.filt3), 0, 12) %in% c("TCGA.BJ.A28X", "TGCA.EL.A3ZP", "TCGA.ET.A3DP","TCGA.KS.A41I")
 dim(thca.filt3)
@@ -334,19 +319,17 @@ dim(thca.filt4)
 saveRDS(thca.filt4, file.path("./", "thca.filt4.rds"))
 saveRDS(dge.filt4, file.path("./", "dge.filt4.rds"))
 ```
-We remove 4 patients with deviant normal samples, but since for one patient we have a tumor and a normal sample (TCGA.BJ.A28X), we end up with 5 samples less. 
 
-Once, we have done the normalization, we perform a MDS plot (which is a tailored PCA) in order to visualize possibles samples with distinctive features from the rest, which can idicate potential problem with samples.
+Once normalization is done, a MDS plot \@ref(fig:MDS) (which is a tailored PCA) is performed in order to visualize possible samples with distinctive features from the rest, which can idicate sample potential problems.
 
-```{r}
+```{r MDS}
 plotMDS(dge.filt4, col = c("red", "blue")[as.integer(dge.filt4$samples$group)], cex = 0.7)
 legend("topleft", c("normal", "tumor"), fill = c("red", "blue"), inset = 0.05, cex = 0.7)
 ```
 
-We can observe two cluster, which indicate a difference between normal and tummor samples. We have to test if this cluster is due to the type tissue or because any batch that confound our interest outcome, in order to continue with further analyses.
+Two clusters can be observed. This highlights a difference between normal and tummor samples. A test is needed in order to asses if the cluster occures due to the type of tissue or because there is any batch effect that confounds our outcome of interest. This is done to avoid missundertandments in further analysis.
 
-Moreover, in normal samples zone we can also observe several tumor samples. If that cluster is because type sample, that can be explained becuse not all thyroid tumors have the same mutations, which produces different levels of severity in cancer patients.
-
+Moreover, in the cluster created by normal samples some tumor samples are observed. If we discard the bathc effect, leading that the clustering is due to the type of sample, that can be explained becuse not all thyroid tumors have the same mutations, which produces different levels of severity in cancer patients.
 
 ## Batch identification
 
