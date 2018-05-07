@@ -356,7 +356,7 @@ From all this data, it can be considered as possible surrogate variables the tss
 *TSS*
 TSS is going to be considered as a possible confunding variable cause of a batch effect. Considering the outcome of interest as molecular changes between sample types, tumor vs. normal,the cross-classification of this outcome with TSS is going to be examined.
 
-```{r}
+```{r tsstable}
 table(data.frame(TYPE=thca.filt4$type, TSS=tss))
 ```
 
@@ -387,25 +387,17 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(tss))), fill=sort(unique(batch)))
 ```
 
-##UNTIL HERE !!!
+Evident clustering depending of the tss can't be observed, so a batch effect due tu this variable is discarded.
 
-We can observe there is not evident clustering depending of the tss, so we can descard it as a 
-possible batch.
-
-In Figure \@ref(fig:mdsPlot) we show the corresponding MDS plot. Here we see more clearly that the
-first source of variation separates tumor from normal samples. We can also observe that two tumor
-samples, corresponding to individuals `KL-8404` and `KN-8427` are separated from the rest, just as
-it happens in the hierchical clustering. A closer examination of their corresponding MA-plots also
-reveals a slight dependence of expression changes on average expression. We may consider discarding
-these two samples and doing the MDS plot again to have a closer look to the differences among the rest
-of the samples and their relationship with TSS.
+A similar case is observed when analyzing Plate \@ref(fig:sampleClustering2) and PortionAnalyte \@ref(fig:sampleClustering3), a batch effect is not observed as different cathegories do not cluster separately.
 
 *Plate*
-```{r}
+
+```{r platetable}
 table(data.frame(TYPE=thca.filt4$type, plate=plate))
 ```
 
-```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S8: Hierarchical clustering of the samples by Plate."}
+```{r sampleClustering2, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S8: Hierarchical clustering of the samples by Plate."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -428,11 +420,11 @@ legend("topright", paste("Batch", sort(unique(batch)), levels(factor(plate))), f
 
 *PortionAnalyte*
 
-```{r}
+```{r portionanalytetable}
 table(data.frame(TYPE=thca.filt4$type, PA=portionanalyte))
 ```
 
-```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S10: Hierarchical clustering of the samples by Portion Analyuc."}
+```{r sampleClustering3, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S10: Hierarchical clustering of the samples by Portion Analyuc."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -453,14 +445,17 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(portionanalyte))), fill=sort(unique(batch)))
 ```
 
-
 *Samplevial*
 
-```{r}
+When analyzin Samplevial \@ref(fig:sampleClustering4), it is observed a clear clusterin of all sampels corresponding to different sample vials.
+
+The corresponding MDS plot \@ref(fig:mdsPlot) is also performed in order to visualize in a different way the clustering of samples, confirming this clustering.
+
+```{r samplevialtable}
 table(data.frame(TYPE=thca.filt4$type, SV=samplevial))
 ```
 
-```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S12: Hierarchical clustering of the samples by Portion Analyuc."}
+```{r sampleClustering4, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S12: Hierarchical clustering of the samples by Portion Analyuc."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -481,16 +476,14 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-From this hierchical clustering plot, we can observe that there is a different cluster depending 
-of the samplevial we use, so they can confounding with the interest outcome we want. For that reason,
-we are going to adjust or remove this batch in order to get a non-biased results.
+Due to that clustering, sample vial is considered to cause a confunding effect with the outcome of interest, it is considered a real batch effect. For that reason, this batch effect is going to be adjusted or removed in order to get a non-biased result.
 
 ```{r mdsPlot, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S11: Multidimensional scaling plot of the samples."}
 plotMDS(dge.filt4, labels=outcome, col=batch)
 legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(samplevial))),
        fill=sort(unique(batch)), inset=0.05)
 ```
-REAL BATCH!!!
+
 ## Session information
 
 ```{r, message=FALSE}
