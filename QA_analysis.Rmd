@@ -53,7 +53,7 @@ In order to ease the manipulation of the data $\log_2$ CPM values of expression 
 library(edgeR)
 
 dge <- DGEList(counts=assays(thca)$counts, genes=mcols(thca))
-saveRDS(dge, file.path("./", "dge.rds"))
+saveRDS(dge, file.path("results", "dge.rds"))
 ```
 
 ```{r logCPM}
@@ -229,8 +229,8 @@ legend("topright", c("All genes", "Filtered genes"), fill = c("grey", "darkred")
 After filtering the dataset with both methods, 9423 genes are left to perform a differential expression analysis.
 
 ```{r unnorm}
-saveRDS(thca.filt3, file.path("./", "thca.filt.unnorm.rds"))
-saveRDS(dge.filt3, file.path("./", "dge.filt.unnorm.rds"))
+saveRDS(thca.filt3, file.path("results", "thca.filt.unnorm.rds"))
+saveRDS(dge.filt3, file.path("results", "dge.filt.unnorm.rds"))
 ```
 
 ## Normalization
@@ -247,8 +247,8 @@ assays(thca.filt3)$logCPM <- cpm(dge.filt3, log=TRUE, normalized.lib.sizes=TRUE,
 ```
 
 ```{r norm}
-saveRDS(thca.filt3, file.path("./", "thca.filt.rds"))
-saveRDS(dge.filt3, file.path("./", "dge.filt.rds"))
+saveRDS(thca.filt3, file.path("results", "thca.filt.rds"))
+saveRDS(dge.filt3, file.path("results", "dge.filt.rds"))
 ```
 
 ## MA-plots
@@ -310,8 +310,8 @@ thca.filt4 <- thca.filt3[, !maskbad]
 dge.filt4 <- dge.filt3[, !maskbad]
 dim(dge.filt4)
 dim(thca.filt4)
-saveRDS(thca.filt4, file.path("./", "thca.filt4.rds"))
-saveRDS(dge.filt4, file.path("./", "dge.filt4.rds"))
+saveRDS(thca.filt4, file.path("results", "thca.filt4.rds"))
+saveRDS(dge.filt4, file.path("results", "dge.filt4.rds"))
 ```
 
 Once normalization is done, a MDS plot \@ref(fig:MDS) (which is a tailored PCA) is performed in order to visualize possible samples with distinctive features from the rest, which can indicate sample potential problems.
