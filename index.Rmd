@@ -66,15 +66,15 @@ dir.create("results")
 
 
 ```{r echo=FALSE, results='asis'}
-cat(readLines("QAanalysis.knit.md"), sep="\n")
+cat(readLines("./QA_analysis.Rmd"), sep="\n")
 ```
 
 ```{r echo=FALSE, results='asis'}
-cat(readLines("DEanalysis.knit.md"), sep="\n")
+cat(readLines("./DE_analysis.Rmd"), sep="\n")
 ```
 
 ```{r echo=FALSE, results='asis'}
-cat(readLines("FEanalysis.knit.md"), sep="\n")
+cat(readLines("./FEanalysis.Rmd"), sep="\n")
 ```
 
 # References
