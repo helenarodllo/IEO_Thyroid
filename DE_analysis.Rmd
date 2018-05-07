@@ -26,9 +26,10 @@ dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
 
 # Differential expression
 
-As we have seen in batch identification, there is a cluster of our dataset regarding to the samplevial which can be confunding with our interest outcome variable. Samplevial variable has 5 states with different sample sizes for each one, not enough size to adjust the data for that batch. For that reason, we are going to perform a simple examination of expression changes and their associated p-values, with the R/Bioconductor package [sva](http://bioconductor.org/packages/sva), in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset. After this adjustment, we have to check if the effect of the detected batch is removed.
+As it is seen in batch identification, there is a cluster of the dataset regarding to the samplevial, which can be confunding with the outcome of interest. Samplevial variable has 5 states with different sample sizes for each one, there is not enough size to adjust the data for that batch. For that reason, a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
 
-First of all, we compute how many significant differential expressed genes do we have in our dataset without any batch adjustment. We use FDR because it can accept some false positives and be more laxe. 
+First of all, the number of significant differential expressed genes is calculated \@ref(pvalue), this is done without any batch adjustment. 
+The FDR approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
 
 ```{r pvalue}
 mod <- model.matrix(~thca.filt$type, data = colData(thca.filt))
@@ -38,7 +39,7 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 ```
 
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
-their expression at FDR < 1%. In Figure \@ref(fig:pdist) below we show the distribution of the resulting p-values.
+their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
 ```{r pdist, echo=FALSE, out.width="400px", fig.cap="Figure X: Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1)
@@ -46,7 +47,8 @@ hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1)
 
 This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as diferential expressed genes.
 
-Now, we svestimate surrogate variables using the `sva()` function.
+The following step is to estimate surrogate variables by the sva method \@rev(sva). 
+`r sv$n` surrogate variables are found. Taking into account this data, the extent of differential expression is assessed adjusting for these surrogate variables \@rev(batchadjust).
 
 ```{r sva}
 library(sva)
@@ -56,8 +58,6 @@ sv$n
 names(sv)
 ```
 
-The SVA algorithm has found `r sv$n` surrogate variables. That way, we are going to use them to assess againt the extent of differential expression this time adjusting for these surrogate variables.
-
 ```{r batchadjust}
 modsv <- cbind(mod, sv$sv)
 mod0sv <- cbind(mod0, sv$sv)
@@ -65,15 +65,14 @@ pvsv <- f.pvalue(assays(thca.filt)$logCPM, modsv, mod0sv)
 sum(p.adjust(pvsv, method="fdr") < 0.01)
 ```
 
-We have increased the number of changing genes to `r sum(p.adjust(pvsv, method="fdr") < 0.01)` with the batch adjustment for batch effects.
-Figure \@ref(fig:psvdist) shows the resulting distribution of p-values.
+The number of differential expressed genes has increased to `r sum(p.adjust(pvsv, method="fdr") < 0.01)` with the batch adjustment.
+Figure \@ref(fig:psvdist) shows the resulting distribution of p-values. More significant genes with FDR less than 1% can be observed.
 
 ```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Figure X: Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
 hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1)
 ```
 
-In this histogram, we can observe there is more significant genes with FDR less than 1%.
-Now that we have applied the batch adjustment, we have to check of our detected batch is adjusted by performing a hierarchical clustering.
+After the batch adjustement, the previously detected coundufnding effect due to sample vial is checked \@ref(sampleClusteringAdjust).
 
 ```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Figure X: Hierarchical clustering of the samples after adjusting for surrogate variables"}
 samplevial <- substr(colnames(thca.filt), 14, 16)
@@ -97,7 +96,8 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-We observe that there is still two cluster due to the batch effect caused by samplevial, sva doesn't work for this batch, so we are going to remove it with an aggresive strategy called *Singular Value Decomposition (SVD)* and visualize again the results with a Hierarchical Clustering. 
+It can be observed that there is still two clusters due to the batch effect caused by samplevial, sva doesn't work for this variable. For this reason, an agressive strategy called *Singular Value Decomposition (SVD)* is used in order to remove this conunfunding effect \@ref(svd). 
+Results are again visualized with a Hierarchical Clustering \@ref(sampleClusteringRemov). 
 
 ```{r svd}
 library(corpcor)
@@ -129,9 +129,9 @@ plot(sampleDendrogram, main = "Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
 ```
 
-After SVD, we observe that there is no clustering among samples, so it means we success in removing batch effect of samplevial in order to avoid confounding results in our interest outcome.
+After SVD, a clustering among samples is not observed, removing the batch effect of sample vial is been achieved succesfully. Counfunding results in the outcome of interest are avoided.
 
-Now we have adjust our dataset by possible surrogate variables, we want to obtain the truly differential expressed genes between tumor and normal samples with significant logFC and p-value.
+Finally, the aim is to obtain the truly differentially expressed genes between tumor and normal samples with significant logFC and p-value.
 
 ```{r genes}
 tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
@@ -145,10 +145,10 @@ genes$FDRpval <- p.adjust(gen$PValue, method = "fdr")
 head(genes)
 ```
 
-From the 9423 genes that have passed filters, we have obtained that 7519 genes has a significant p-value (<0.01) in previous analysis, but they are not all differential expressed genes because some of them have a logFC close to 0 which meand not differnece between groups. 
+From the 9423 genes that have passed filters, 7519 genes have a significant p-value (<0.01) in previous analysis, but they are not all differentially expressed genes because some of them have a logFC close to 0 which meand not differnece between groups. 
 
-In order to have a visual idea of the differential expressed genes, we perform a *Volcano Plot*, widely used diagnostic
-plot in DE analysis, to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
+In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed \@ref(VolcanoPlot), a widely used diagnostic
+plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
 ```{r VolcanoPlot, fig.height=2.5, fig.width=3, echo=FALSE, message=FALSE, fig.cap="Figure X: Volcano Plot of normalized genes."}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
@@ -159,9 +159,9 @@ with(subset(genes, PValue<.05 & abs(LogFC)>2.5), points(LogFC, -log10(PValue), p
 abline(h=-log10(max(genes$PValue[genes$FDRpval <= 0.05])), lty=2, col="red")
 ```
 
-We can observe than most of the genes are located vertical to a value of Log2FC close to 0 that means that they are not differential expressed between groups, altough they have a significant p-value (orange points), we also observe point with a high log2FC suggesting differential expression but with a non-significant p-value (blue points) and finally we have the green points that are those genes with a high logFC and significant p-value.
+Most of the genes are located vertically to a value of Log2FC close to 0, what means that they are not differential expressed between groups, altough they have a significant p-value (orange points). Points with a high log2FC are also observed, suggesting differential expression but with a non-significant p-value (blue points). Finally, green points are those genes with a high logFC and significant p-value.
 
-As we only are interested in the green genes, we need to filter our table by FDR < 0.01, to get only significant genes; and by logFC > abs(2.5) in order to get the truly differential expressed genes between tumor and normal samples. The table \@ref(DEgenes) shows the 111 DE genes wiht their correspoding values.
+As we only are interested in the green genes, there is a need to filter the table by FDR < 0.01, to get only significant genes; and by logFC > abs(2.5) in order to get the truly differentially expressed genes between tumor and normal samples. The table \@ref(DEgenes) shows the 111 DE genes wiht their correspoding values.
 
 ```{r DEgenes}
 maskfdr <- gen$FDRpval < 0.01
@@ -170,7 +170,7 @@ genes.DE <- genes[maskfdr & maskfc, ]
 genes.DE
 ```
 
-We perform a prior bibliographic search of this resulted genes, and we verify that they are mostly related with thyroid carcinoma.
+A prior bibliographic search if the resulting genes was performed, those genes are verified to be mostly related with thyroid carcinome.
 
 ## Session information
 
