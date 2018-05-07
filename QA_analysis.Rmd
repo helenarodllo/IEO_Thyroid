@@ -333,11 +333,8 @@ Moreover, in the cluster created by normal samples some tumor samples are observ
 
 ## Batch identification
 
-We will search now for potential surrogate of batch effect indicators. Given that each sample
-names corresponds to a TCGA barcode (see https://wiki.nci.nih.gov/display/TCGA/TCGA+barcode),
-following the strategy described in http://bioinformatics.mdanderson.org/main/TCGABatchEffects:Overview
-we are going to derive different elements of the TCGA barcode and examine their distribution
-across samples.
+The next step is to search for potential surrogate variables. Given that each sample
+name corresponds to a TCGA barcode, different elements are going to be derived of this barcode. Their destribution will be examined across samples. 
 
 ```{r}
 tss <- substr(colnames(thca.filt4), 6, 7)
@@ -352,35 +349,22 @@ samplevial <- substr(colnames(thca.filt4), 14, 16)
 table(samplevial)
 ```
 
-From this information we can make the following observations:
+It can be seen that all samples were sequenced at the same center (07). There are six different combinations of tissue type and vial in the dataset, which can be a potential surrogate variable. Samples were collected across different tissue source sites (TSS). Different samples were sequences with different plates, so this can also be a potential confunding variable. Finally, most of the samples were sequenced using one portion and analyte combination, but there are other 5 differentent combinations.
 
-  * All samples were sequenced at the same center (07)
-
-  * In this dataset, we can find six different combinations of tissue type and vial, it can be a potential batch.
-
-  * Samples were collected across different tissue source sites (TSS).
-
-  * Different samples were sequenced with different plates, so it can be also a potential batch.
-
-  * Most of the samples were sequenced using one portion and analyte combinations, but there is other 5 different portion and analyte combinations
-
-From this data we can consider as possible surrogates of batch effect indicator the tssm, plate, portionanalytic and samplevial.
+From all this data, it can be considered as possible surrogate variables the tssm, plate, portionalytic and samplevial.
 
 *TSS*
-We are going to use the TSS as surrogate of batch effect indicator. Considering our outcome
-of interest as molecular changes between sample types, tumor vs. normal, we will examine now
-the cross-classification of this outcome with TSS.
+TSS is going to be considered as a possible confunding variable cause of a batch effect. Considering the outcome of interest as molecular changes between sample types, tumor vs. normal,the cross-classification of this outcome with TSS is going to be examined.
 
 ```{r}
 table(data.frame(TYPE=thca.filt4$type, TSS=tss))
 ```
 
-Observe that normal tissues from most of TSS are under-represented with respect to the tumor tissues. If TSS is a source of expression variability, this under-representation in the normal samples may lead to a potential confounding effect.
+It can be observed that normal tissues from most of TSS are under-represented with respect to the tumor tissues. If TSS is a source of expression variability, this under-representation in the normal samples may lead to a potential confounding effect.
 
-We examine now how samples group together by hierarchical clustering and multidimensional
-scaling, annotating the outcome of interest and the the surrogate of batch indicator. We
-calculate again log CPM values with a higher prior count to moderate extreme fold-changes
-produced by low counts. The resulting dendrogram is shown in Figure \@ref(fig:sampleClustering).
+Sample groups are going to be examined together by hierarchical clustering and multidimensional scaling, annotating the outcome of interest and the counfunding indicator. 
+The locCPM values are recalculated with a higher prior cound in order to moderate extreme fold-changes produced by low counts.
+The resulting dendrogram is shown in Figure \@ref(fig:sampleClustering).
 
 ```{r sampleClustering, fig.height=7, fig.width=14, dpi=100, echo=TRUE, fig.cap="Figure S6: Hierarchical clustering of the samples."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
@@ -402,6 +386,8 @@ sampleDendrogram <- dendrapply(sampleDendrogram,
 plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(tss))), fill=sort(unique(batch)))
 ```
+
+##UNTIL HERE !!!
 
 We can observe there is not evident clustering depending of the tss, so we can descard it as a 
 possible batch.
