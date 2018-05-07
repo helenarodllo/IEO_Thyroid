@@ -42,7 +42,7 @@ There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantl
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
 ```{r pdist, echo=FALSE, out.width="400px", fig.cap="Figure X: Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
-hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1)
+hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
 This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as diferential expressed genes.
@@ -69,7 +69,7 @@ The number of differential expressed genes has increased to `r sum(p.adjust(pvsv
 Figure \@ref(fig:psvdist) shows the resulting distribution of p-values. More significant genes with FDR less than 1% can be observed.
 
 ```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Figure X: Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
-hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1)
+hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
 After the batch adjustement, the previously detected coundufnding effect due to sample vial is checked \@ref(sampleClusteringAdjust).
