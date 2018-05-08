@@ -42,7 +42,7 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
-```{r pdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 16. Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
+```{r pdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 16. Distribution of raw p-values for an F-test on every gene between tumor and normal samples.\\label{fig:plot}"}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
@@ -69,13 +69,13 @@ sum(p.adjust(pvsv, method="fdr") < 0.01)
 The number of differential expressed genes has increased to `r sum(p.adjust(pvsv, method="fdr") < 0.01)` with the batch adjustment.
 Figure \@ref(fig:psvdist) shows the resulting distribution of p-values. More significant genes with FDR less than 1% can be observed.
 
-```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 17. Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
+```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 17. Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA.\\label{fig:plot}"}
 hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
 After the batch adjustement, the previously detected coundufnding effect due to sample vial is checked \@ref(sampleClusteringAdjust).
 
-```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 18. Hierarchical clustering of the samples after adjusting for surrogate variables"}
+```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 18. Hierarchical clustering of the samples after adjusting for surrogate variables\\label{fig:plot}"}
 samplevial <- substr(colnames(thca.filt), 14, 16)
 logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
@@ -97,7 +97,8 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-It can be observed that there is still two clusters due to the batch effect caused by samplevial, sva doesn't work for this variable. For this reason, an agressive strategy called *Singular Value Decomposition (SVD)* is used in order to remove this conunfunding effect \@ref(svd). 
+It can be observed that there is still two clusters due to the batch effect caused by samplevial, sva doesn't work for this variable. For this reason, an agressive strategy called *Singular Value Decomposition (SVD)* is used in order to remove this conunfunding effect \@ref(svd).
+
 Results are again visualized with a Hierarchical Clustering \@ref(sampleClusteringRemov). 
 
 ```{r svd}
@@ -111,7 +112,7 @@ class(svdexp)
 dim(svdexp)
 ```
 
-```{r sampleClusteringRemov, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 19: Hierarchical clustering after removing samplevial effect."}
+```{r sampleClusteringRemov, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 19: Hierarchical clustering after removing samplevial effect.\\label{fig:plot}"}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleClustering <- hclust(d)
 sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
@@ -151,7 +152,7 @@ From the 9423 genes that have passed filters, 7519 genes have a significant p-va
 In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed \@ref(VolcanoPlot), a widely used diagnostic
 plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=2.5, fig.width=3, echo=FALSE, message=FALSE, fig.cap="Supplementary figure 20. Volcano Plot of normalized genes."}
+```{r VolcanoPlot, fig.height=5, fig.width=7, echo=FALSE, message=FALSE, fig.cap="Supplementary figure 20. Volcano Plot of normalized genes.\\label{fig:plot}"}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))
