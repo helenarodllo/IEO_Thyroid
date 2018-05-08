@@ -471,7 +471,7 @@ legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial)
 Due to that clustering, sample vial is considered to cause a confunding effect with the outcome of interest, it is considered a real batch effect. For that reason, this batch effect is going to be adjusted or removed in order to get a non-biased result.
 
 ```{r mdsPlot, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Multidimensional scaling plot of the samples.\\label{fig:mdsPlot}"}
-plotMDS(dge.filt4, labels=outcome, col=batch,ain ="Sample vial MDS", xlab = "Leading logFC dim1", ylab = "Leading logFC dim2")
+plotMDS(dge.filt4, labels=outcome, col=batch, main ="Sample vial MDS", xlab = "Leading logFC dim1", ylab = "Leading logFC dim2")
 legend("bottomleft", paste("Batch", sort(unique(batch)), levels(factor(samplevial))),
        fill=sort(unique(batch)), inset=0.05)
 ```
