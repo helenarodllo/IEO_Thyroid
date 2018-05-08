@@ -1,6 +1,8 @@
 ---
 output:
-  BiocStyle::html_document
+  bookdown::gitbook: default
+  bookdown::pdf_book: default
+  #BiocStyle::html_document
 ---
 
 <!---
@@ -23,14 +25,12 @@ opts_chunk$set(cache=TRUE,
                fig.align="center",
                comment="")
 
-se <- readRDS(file.path("rawCounts", "seKICH.rds"))
+thca <- readRDS(file.path("raw_counts", "seTHCA.rds"))
 dge <- readRDS(file.path("results", "dge.rds"))
-se.filt.unnorm <- readRDS(file.path("results", "se.filt.unnorm.rds"))
+thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
 dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
-se.filt <- readRDS(file.path("results", "se.filt.rds"))
-dge.filt <- readRDS(file.path("results", "dge.filt.rds"))
-
-
+thca.filt <- readRDS(file.path("results", "thca.filt4.rds"))
+dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
 ```
 
 # Functional analysis

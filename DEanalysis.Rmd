@@ -1,6 +1,8 @@
 ---
 output:
-  BiocStyle::html_document
+  bookdown::gitbook: default
+  bookdown::pdf_book: default
+  #BiocStyle::html_document
 ---
 
 ```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
@@ -17,7 +19,7 @@ opts_chunk$set(cache=TRUE,
                fig.align="center",
                comment="")
 
-thca <- readRDS("./seTHCA.rds")
+thca <- readRDS(file.path("raw_counts", "seTHCA.rds"))
 dge <- readRDS(file.path("results", "dge.rds"))
 thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
 dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
@@ -42,7 +44,7 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
-```{r pdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 16. Distribution of raw p-values for an F-test on every gene between tumor and normal samples.\\label{fig:plot}"}
+```{r pdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 16. Distribution of raw p-values for an F-test on every gene between tumor and normal samples.\\label{fig:pdist}"}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
@@ -75,7 +77,7 @@ hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab
 
 After the batch adjustement, the previously detected coundufnding effect due to sample vial is checked \@ref(sampleClusteringAdjust).
 
-```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 18. Hierarchical clustering of the samples after adjusting for surrogate variables\\label{fig:plot}"}
+```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 18. Hierarchical clustering of the samples after adjusting for surrogate variables\\label{fig:sampleClusteringAdjust}"}
 samplevial <- substr(colnames(thca.filt), 14, 16)
 logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
@@ -83,7 +85,7 @@ sampleClustering <- hclust(d)
 batch <- as.integer(factor(samplevial))
 sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
 names(batch) <- colnames(thca.filt)
-outcome <- paste(substr(colnames(thca.filt), 9, 12), as.character(thca.filt$type), sep="-")
+outcome <- as.character(thca.filt$type)
 names(outcome) <- colnames(thca.filt)
 sampleDendrogram <- dendrapply(sampleDendrogram,
                                function(x, batch, labels) {
@@ -112,7 +114,7 @@ class(svdexp)
 dim(svdexp)
 ```
 
-```{r sampleClusteringRemov, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 19: Hierarchical clustering after removing samplevial effect.\\label{fig:plot}"}
+```{r sampleClusteringRemov, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 19: Hierarchical clustering after removing samplevial effect.\\label{fig:sampleClusteringRemov}"}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleClustering <- hclust(d)
 sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
@@ -140,19 +142,19 @@ tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
 norExp <- rowMeans(logCPM[, thca.filt$type == "normal"])
 log2fc <- norExp - tumExp
 ranking <- order(abs(log2fc), decreasing = TRUE)
-genes <- data.frame(LogFC = round(log2fc[ranking], digits = 3), PValue = round(pvsv, digits = 3), row.names = rowData(thca.filt)$symbol[ranking],
-check.names = FALSE)
+genes <- data.frame(LogFC = round(log2fc[ranking], digits = 3), PValue = round(pvsv, digits = 3), 
+                    row.names = rowData(thca.filt)$symbol[ranking], check.names = FALSE)
 genes$FDRcutoff <- (1:nrow(genes) * 0.05)/nrow(genes)
 genes$FDRpval <- p.adjust(genes$PValue, method = "fdr")
 head(genes)
 ```
 
-From the 9423 genes that have passed filters, 7519 genes have a significant p-value (<0.01) in previous analysis, but they are not all differentially expressed genes because some of them have a logFC close to 0 which meand not differnece between groups. 
+From the 9423 genes that have passed filters, 7519 genes have a significant p-value (< 0.01) in previous analysis, but they are not all differentially expressed genes because some of them have a logFC close to 0 which meand not differnece between groups. 
 
 In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed \@ref(VolcanoPlot), a widely used diagnostic
 plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=5, fig.width=7, echo=FALSE, message=FALSE, fig.cap="Supplementary figure 20. Volcano Plot of normalized genes.\\label{fig:plot}"}
+```{r VolcanoPlot, fig.height=5, fig.width=7, echo=FALSE, message=FALSE, fig.cap="Supplementary figure 20. Volcano Plot of normalized genes.\\label{fig:VolcanoPlot}"}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))
@@ -169,7 +171,7 @@ As we only are interested in the green genes, there is a need to filter the tabl
 maskfdr <- genes$FDRpval < 0.01
 maskfc <- genes$LogFC < -2.5 | genes$LogFC > 2.5
 genes.DE <- genes[maskfdr & maskfc, ]
-genes.DE
+head(genes.DE)
 ```
 
 A prior bibliographic search if the resulting genes was performed, those genes are verified to be mostly related with thyroid carcinome.
