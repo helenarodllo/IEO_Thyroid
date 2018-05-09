@@ -5,10 +5,10 @@ author:
   affiliation:
   - &id Master Programme on Bioinformatics for Health Sciences, Universitat Pompeu Fabra, Barcelona, Spain
   email: lydia.fortea01@estudiant.upf.edu
-- name: Julia Mir Pedrol
+- name: Júlia Mir Pedrol
   affiliation: *id
   email: julia.mir01@estudiant.upf.edu
-- name: Helena Rodriguez Lloveras
+- name: Helena Rodríguez Lloveras
   affiliation: *id
   email: helena.rodriguez01@estudiant.upf.edu
 date: "`r format(Sys.time(), '%B %e, %Y')`"
