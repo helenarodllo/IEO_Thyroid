@@ -60,21 +60,20 @@ you should modify the `makefile`.
 The directory `results` will contain resulting files produced during the analysis,
 however, figures are going to end by default directories associated with the
 source filenames from where they were created.
+
 ```{r, echo=F}
 dir.create("results")
 ```
 
-
 ```{r echo=FALSE, results='asis'}
-cat(readLines("./QA_analysis.Rmd"), sep="\n")
+cat(readLines("QAanalysis.knit.md"), sep="\n")
 ```
 
 ```{r echo=FALSE, results='asis'}
-cat(readLines("./DE_analysis.Rmd"), sep="\n")
+cat(readLines("DEanalysis.knit.md"), sep="\n")
 ```
 
 ```{r echo=FALSE, results='asis'}
-cat(readLines("./FEanalysis.Rmd"), sep="\n")
+cat(readLines("FEanalysis.knit.md"), sep="\n")
 ```
-
 # References

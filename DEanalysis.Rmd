@@ -2,7 +2,6 @@
 output:
   bookdown::gitbook: default
   bookdown::pdf_book: default
-  #BiocStyle::html_document
 ---
 
 ```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
@@ -11,6 +10,7 @@ library(SummarizedExperiment)
 library(edgeR)
 library(geneplotter)
 library(sva)
+library(corpcor)
 
 opts_chunk$set(cache=TRUE,
                cache.path="cache/file2",
@@ -29,10 +29,11 @@ dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
 
 # Differential expression
 
-As it is seen in batch identification, there is a cluster of the dataset regarding to the samplevial, which can be confunding with the outcome of interest. Samplevial variable has 5 states with different sample sizes for each one, there is not enough size to adjust the data for that batch. For that reason, a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
+As it has seen in batch identification, there is a cluster of the dataset regarding to the samplevial, which can be confunding with the outcome of interest. Samplevial variable has 5 states with different and no-uniform sample sizes for each one, and we have a small dataset so we can not adjust the data for this batch. 
 
-First of all, the number of significant differential expressed genes is calculated \@ref(pvalue), this is done without any batch adjustment. 
-The FDR approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
+That way, a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
+
+First of all, the number of significant differential expressed genes is calculated in \@ref(pvalue), this is done without any batch adjustment. The FDR approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
 
 ```{r pvalue}
 mod <- model.matrix(~thca.filt$type, data = colData(thca.filt))
@@ -44,11 +45,11 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
-```{r pdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 16. Distribution of raw p-values for an F-test on every gene between tumor and normal samples.\\label{fig:pdist}"}
+```{r pdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
-This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as diferential expressed genes.
+This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as significant diferential expressed genes.
 
 The following step is to estimate surrogate variables by the sva method \@rev(sva). 
 
@@ -59,7 +60,7 @@ sv$n
 names(sv)
 ```
 
-`r sv$n` surrogate variables are found. Taking into account this data, the extent of differential expression is assessed adjusting for these surrogate variables \@rev(batchadjust).
+`r sv$n` surrogate variables are found, so the extent of differential expression is assessed adjusting for them \@rev(batchadjust).
 
 ```{r batchadjust}
 modsv <- cbind(mod, sv$sv)
@@ -69,15 +70,18 @@ sum(p.adjust(pvsv, method="fdr") < 0.01)
 ```
 
 The number of differential expressed genes has increased to `r sum(p.adjust(pvsv, method="fdr") < 0.01)` with the batch adjustment.
-Figure \@ref(fig:psvdist) shows the resulting distribution of p-values. More significant genes with FDR less than 1% can be observed.
 
-```{r psvdist, echo=FALSE, out.width="400px", fig.cap="Supplementary figure 17. Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA.\\label{fig:plot}"}
+Figure \@ref(fig:psvdist) shows the resulting distribution of adjusted p-values. More significant genes with FDR less than 1% can be observed.
+
+```{r psvdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
 hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
-After the batch adjustement, the previously detected coundufnding effect due to sample vial is checked \@ref(sampleClusteringAdjust).
+The distribution of adjusted p-values is very similar to raw ones, but we have more significant genes than before.
 
-```{r sampleClusteringAdjust, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 18. Hierarchical clustering of the samples after adjusting for surrogate variables\\label{fig:sampleClusteringAdjust}"}
+Once we have done a batch adjustement, we want to check, Figure \@ref(fig:sampleClusteringAdjust), if our detected surrogate varible (samplevial) still has a confounding effect in our interested outcome variable.
+
+```{r sampleClusteringAdjust, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables"}
 samplevial <- substr(colnames(thca.filt), 14, 16)
 logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
@@ -99,12 +103,9 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-It can be observed that there is still two clusters due to the batch effect caused by samplevial, sva doesn't work for this variable. For this reason, an agressive strategy called *Singular Value Decomposition (SVD)* is used in order to remove this conunfunding effect \@ref(svd).
-
-Results are again visualized with a Hierarchical Clustering \@ref(sampleClusteringRemov). 
+It can be observed that there is still two clusters due to the surrogate variable, samplevial. The batch adjustement by sva had no effect for this variable, so we are going to use an agressive strategy called *Singular Value Decomposition (SVD)* in order to remove this batch effect \@ref(svd). Results would be again visualized with a Hierarchical Clustering \@ref(fig:sampleClusteringRemov). 
 
 ```{r svd}
-library(corpcor)
 s <- fast.svd(t(scale(t(logCPM), center = TRUE, scale = TRUE)))
 pcSds <- s$d
 pcSds[1] <- 0
@@ -114,7 +115,7 @@ class(svdexp)
 dim(svdexp)
 ```
 
-```{r sampleClusteringRemov, fig.height=7, fig.width=14, dpi=100, echo=FALSE, fig.cap="Supplementary figure 19: Hierarchical clustering after removing samplevial effect.\\label{fig:sampleClusteringRemov}"}
+```{r sampleClusteringRemov, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering after removing samplevial effect."}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleClustering <- hclust(d)
 sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
@@ -133,9 +134,9 @@ plot(sampleDendrogram, main = "Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
 ```
 
-After SVD, a clustering among samples is not observed, removing the batch effect of sample vial is been achieved succesfully. Counfunding results in the outcome of interest are avoided.
+After SVD,removing the batch effect of sample vial is been achieved succesfully, in order to avoid counfunding results in the outcome of interest.
 
-Finally, the aim is to obtain the truly differentially expressed genes between tumor and normal samples with significant logFC and p-value.
+Now that we have normalized and adjust out data, we can obtain the truly differentially expressed genes between tumor and normal samples with significant logFC and p-value.
 
 ```{r genes}
 tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
@@ -149,12 +150,12 @@ genes$FDRpval <- p.adjust(genes$PValue, method = "fdr")
 head(genes)
 ```
 
-From the 9423 genes that have passed filters, 7519 genes have a significant p-value (< 0.01) in previous analysis, but they are not all differentially expressed genes because some of them have a logFC close to 0 which meand not differnece between groups. 
+From the 9423 genes that have passed all previous filters, 7519 genes have a significant p-value (< 0.01), but they are not all differentially expressed genes because several ones have a logFC close to 0 which means that there is not differnece between groups. 
 
-In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed \@ref(VolcanoPlot), a widely used diagnostic
+In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed in Figure \@ref(fig:VolcanoPlot), a widely used diagnostic
 plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=5, fig.width=7, echo=FALSE, message=FALSE, fig.cap="Supplementary figure 20. Volcano Plot of normalized genes.\\label{fig:VolcanoPlot}"}
+```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes."}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))

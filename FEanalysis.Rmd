@@ -2,7 +2,6 @@
 output:
   bookdown::gitbook: default
   bookdown::pdf_book: default
-  #BiocStyle::html_document
 ---
 
 <!---
