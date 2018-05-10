@@ -100,7 +100,7 @@ sampleDendrogram <- dendrapply(sampleDendrogram,
                                  x
                                }, batch, outcome)
 plot(sampleDendrogram, main="Hierarchical clustering of samples")
-legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
+legend("topright", paste("Vial", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
 It can be observed that there are still two clusters due to the surrogate variable, samplevial. The batch adjustement by SVA had no effect for this variable, so we are going to use an agressive strategy called *Singular Value Decomposition (SVD)* in order to remove this batch effect. Results would be again visualized with a Hierarchical Clustering (Figure \@ref(fig:sampleClusteringRemov)). 
@@ -120,13 +120,13 @@ d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
 ## for every node in the dendrogram if it is a leaf node
 if (is.leaf(x)) {
-attr(x, "nodePar") <- list(lab.col = as.vector(batch[attr(x, "label")])) ## color by batch
+attr(x, "nodePar") <- list(lab.col = as.vector(batch[attr(x, "label")])) ## color by sample vial
 attr(x, "label") <- as.vector(labels[attr(x, "label")]) ## label by outcome
 }
 x
 }, batch, outcome) ## these are the second and third arguments in the function
 plot(sampleDendrogram, main = "Hierarchical clustering of samples")
-legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
+legend("topright", paste("Vial", sort(unique(batch))), fill = sort(unique(batch)))
 ```
 
 After SVD,removing the batch effect of sample vial is been achieved succesfully, in order to avoid counfunding results in the outcome of interest.
