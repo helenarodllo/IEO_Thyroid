@@ -33,7 +33,7 @@ As it has seen in batch identification, there is a cluster of the dataset regard
 
 That way, a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
 
-First of all, the number of significant differential expressed genes is calculated in \@ref(pvalue), this is done without any batch adjustment. The FDR approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
+First of all, the number of significant differential expressed genes is calculated, this is done without any batch adjustment. The false discovery rate (FDR) approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
 
 ```{r pvalue}
 mod <- model.matrix(~thca.filt$type, data = colData(thca.filt))
@@ -51,7 +51,7 @@ hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab=
 
 This histogram shows that most of the genes have a p-value less than 0.1, so they are considered as significant diferential expressed genes.
 
-The following step is to estimate surrogate variables by the sva method \@rev(sva). 
+The following step is to estimate surrogate variables by the surrogate variable analysis (SVA) method. 
 
 ```{r sva}
 assays(thca.filt)$logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
@@ -60,7 +60,7 @@ sv$n
 names(sv)
 ```
 
-`r sv$n` surrogate variables are found, so the extent of differential expression is assessed adjusting for them \@rev(batchadjust).
+`r sv$n` surrogate variables are found, so the extent of differential expression is assessed adjusting for the.
 
 ```{r batchadjust}
 modsv <- cbind(mod, sv$sv)
@@ -79,9 +79,9 @@ hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab
 
 The distribution of adjusted p-values is very similar to raw ones, but we have more significant genes than before.
 
-Once we have done a batch adjustement, we want to check, Figure \@ref(fig:sampleClusteringAdjust), if our detected surrogate varible (samplevial) still has a confounding effect in our interested outcome variable.
+Once we have done a batch adjustement, we want to check (Figure \@ref(fig:sampleClusteringAdjust)) if our detected surrogate varible (samplevial) still has a confounding effect in our interested outcome variable.
 
-```{r sampleClusteringAdjust, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables"}
+```{r sampleClusteringAdjust, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables."}
 samplevial <- substr(colnames(thca.filt), 14, 16)
 logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
@@ -103,7 +103,7 @@ plot(sampleDendrogram, main="Hierarchical clustering of samples")
 legend("topright", paste("Batch", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
 ```
 
-It can be observed that there is still two clusters due to the surrogate variable, samplevial. The batch adjustement by sva had no effect for this variable, so we are going to use an agressive strategy called *Singular Value Decomposition (SVD)* in order to remove this batch effect \@ref(svd). Results would be again visualized with a Hierarchical Clustering \@ref(fig:sampleClusteringRemov). 
+It can be observed that there are still two clusters due to the surrogate variable, samplevial. The batch adjustement by SVA had no effect for this variable, so we are going to use an agressive strategy called *Singular Value Decomposition (SVD)* in order to remove this batch effect. Results would be again visualized with a Hierarchical Clustering (Figure \@ref(fig:sampleClusteringRemov)). 
 
 ```{r svd}
 s <- fast.svd(t(scale(t(logCPM), center = TRUE, scale = TRUE)))
@@ -117,11 +117,6 @@ dim(svdexp)
 
 ```{r sampleClusteringRemov, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering after removing samplevial effect."}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
-sampleClustering <- hclust(d)
-sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- as.character(thca.filt$type)
-names(outcome) <- colnames(thca.filt)
 sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
 ## for every node in the dendrogram if it is a leaf node
 if (is.leaf(x)) {
@@ -155,7 +150,7 @@ From the 9423 genes that have passed all previous filters, 7519 genes have a sig
 In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed in Figure \@ref(fig:VolcanoPlot), a widely used diagnostic
 plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes."}
+```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes. Shows genes sorted by p-value in function of $\log_2$(fold change). Genes with a significant p-value are marked in orange, genes with a highl $\log_2$FC are marked in blue and genes with significant p-value and high $\log_2$FC are marked in gree."}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))
@@ -164,9 +159,9 @@ with(subset(genes, PValue<.05 & abs(LogFC)>2.5), points(LogFC, -log10(PValue), p
 abline(h=-log10(max(genes$PValue[genes$FDRpval <= 0.05])), lty=2, col="red")
 ```
 
-Most of the genes are located vertically to a value of Log2FC close to 0, what means that they are not differential expressed between groups, altough they have a significant p-value (orange points). Points with a high log2FC are also observed, suggesting differential expression but with a non-significant p-value (blue points). Finally, green points are those genes with a high logFC and significant p-value.
+Most of the genes are located vertically to a value of $\log_2$FC close to 0, what means that they are not differential expressed between groups, altough they have a significant p-value (orange points). Points with a high $\log_2$FC are also observed, suggesting differential expression but with a non-significant p-value (blue points). Finally, green points are those genes with a high $\log_2$FC and significant p-value.
 
-As we only are interested in the green genes, there is a need to filter the table by FDR < 0.01, to get only significant genes; and by logFC > abs(2.5) in order to get the truly differentially expressed genes between tumor and normal samples. The table \@ref(DEgenes) shows the 111 DE genes wiht their correspoding values.
+As we are only interested in genes painted in green, there is a need to filter the table by FDR < 0.01, to get only significant genes; and by $\log_2$FC > abs(2.5) in order to get the truly differentially expressed genes between tumor and normal samples. The table below shows the 111 DE genes wiht their correspoding values.
 
 ```{r DEgenes}
 maskfdr <- genes$FDRpval < 0.01
