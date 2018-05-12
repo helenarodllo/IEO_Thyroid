@@ -66,7 +66,7 @@ assays(thca)$logCPM[1:5, 1:5]
 
 In thyroid cancer we consider some variables more important than others as, according to bibliography, significant differences are seen in the categories of this variables related to thyroid cancer. We want to have a first look at these categories before the analysis of the whole data (Figure \@ref(fig:numvars)). This will give us an idea of the distribution of our data and can be useful in further analysis.
 
-```{r numvars, fig.height=20, fig.width=25, fig.cap="Number of samples per cathegory. From top to bottom: type, gender and age."}
+```{r numvars, fig.height=20, fig.width=25, fig.align='center', fig.margin= TRUE, fig.cap="Number of samples per cathegory. From top to bottom: type, gender and age."}
 par(mfrow=c(3, 1))
 #Type
 tumor <- thca[ , colData(thca)$type == "tumor"]
@@ -103,7 +103,7 @@ Other variables as race, ethnicity, tumor_type and tumor_stage have not been ass
 We examine the sequencing depth in terms of total number of sequence read counts mapped to the genome per sample. Figure \@ref(fig:libsizes) below shows the
 sequencing depth per sample, also known as library sizes, in increasing order.
 
-```{r libsizes, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Library sizes. Milions of reads per sample in increasing order."}
+```{r libsizes, echo=FALSE, fig.height=6, fig.width=12, fig.align='center', fig.margin= TRUE, out.width="800px", fig.cap="Library sizes. Milions of reads per sample in increasing order."}
 ord <- order(dge$sample$lib.size/1e6)
 barplot(dge$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads", main="Sequencing depth",
         xlab="Samples", col=c("chocolate1", "skyblue")[(thca$type[ord] == "tumor") + 1], 
@@ -134,7 +134,7 @@ dim(thca.filt)
 
 Once the filters are applied, the dataset have decreased to 467. Now, we perform another sequencing depth distribution (Figure \@ref(fig:filtlibsizes)) in order to check the effect of the filter.
 
-```{r filtlibsizes, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Library size. Milions of reads per sample in increasing order after filtering."}
+```{r filtlibsizes, echo=FALSE, fig.height=6, fig.width=12, fig.align='center', fig.margin= TRUE, out.width="800px", fig.cap="Library size. Milions of reads per sample in increasing order after filtering."}
 ord <- order(dge.filt$sample$lib.size/1e6)
 barplot(dge.filt$sample$lib.size[ord]/1e6, las=1, ylab="Millions of reads", main="Sequencing depth",
         xlab="Samples", col=c("chocolate1", "skyblue")[(thca.filt$type[ord] == "tumor") + 1], 
@@ -149,7 +149,7 @@ in a sample, this can be performed using Count Per Million (CPM) reads or its lo
 
 A box plot of the expression values per samples is also performed (Figure \@ref(fig:distboxplot)) in order to have another visual way to interpret the data. 
 
-```{r distRawExp, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Non-parametric density distribution of expression profiles per sample. Shows density of genes per log2CPM. Tumor samples are ploted in the left and normal samples in the right.", message=FALSE}
+```{r distRawExp, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.align='center', fig.cap="Non-parametric density distribution of expression profiles per sample. Shows density of genes per log2CPM. Tumor samples are ploted in the left and normal samples in the right.", message=FALSE}
 par(mfrow=c(1, 2))
 multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "tumor"])$logCPM)),
              xlab="log 2 CPM", legend=NULL, main="Tumor samples", las=1)
@@ -157,7 +157,7 @@ multidensity(as.list(as.data.frame(assays(thca.filt[, thca.filt$type == "normal"
              xlab="log 2 CPM", legend=NULL, main="Normal samples", las=1)
 ```
 
-```{r distboxplot, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Box plot. Distribution of the expression values across samples.", message=FALSE}
+```{r distboxplot, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.align='center', fig.cap="Box plot. Distribution of the expression values across samples.", message=FALSE}
 boxplot(assays(thca.filt)$logCPM, col = "darkolivegreen3", main="Box Plot of samples", xlab = "Samples", ylab = expression(log[2] * "CPM"), cex.axis = 0.5, cex.main=2.5, cex.lab = 1, las = 1, axes=F)
 ```
 
@@ -169,7 +169,7 @@ For all this reasons, we assume that we do not need further normalization among 
 
 In order to identify lowly expressed genes, the average expression per gene through all samples is calculated. The distribution of those values across genes is represented in the Figure \@ref(fig:exprdist).
 
-```{r exprdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of expression level. Shows the frequency of each gene per average expression level."}
+```{r exprdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.margin= TRUE, fig.align='center', fig.cap="Distribution of expression level. Shows the frequency of each gene per average expression level."}
 avgexp <- rowMeans(assays(thca.filt)$logCPM)
 hist(avgexp, xlab="log2 CPM", main="Distribution of average expression level per gene", 
      las=1, col = "darkolivegreen3", cex.main=2.5)
@@ -202,7 +202,7 @@ dim(thca)
 dim(thca.filt2)
 ```
 
-```{r expfilt1, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of average expression level per gene. Filtering out genes with `r nsamplescutoff` samples with a log2CPM lower than `r cpmcutoff`. Number of genes passing the filter are shown in red."}
+```{r expfilt1, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.align='center', fig.cap="Distribution of average expression level per gene. Filtering out genes with `r nsamplescutoff` samples with a log2CPM lower than `r cpmcutoff`. Number of genes passing the filter are shown in red."}
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), 
           main = "Average expression level", ylab ="Frequency", las = 1, 
           col = "darkolivegreen3", cex.axis = 1.2, cex.lab = 1.5, cex.main=2)
@@ -220,7 +220,7 @@ dge.filt3 <- dge.filt[mask, ]
 dim(thca.filt3)
 ```
 
-```{r expfilt2, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of average expression level per gene with a minimum log2CPM of 3. Numbers of genes passing the previous filter are shown in red. Number of genes passing the current filter are shown in blue"}
+```{r expfilt2, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.align='center', fig.cap="Distribution of average expression level per gene with a minimum log2CPM of 3. Numbers of genes passing the previous filter are shown in red. Number of genes passing the current filter are shown in blue"}
 h <- hist(avgexp, xlab = expression("Expression level (" * log[2] * "CPM)"), 
           main = "Average expression level", ylab ="Frequency", las = 1, 
           col = "darkolivegreen3", cex.axis = 1.2, cex.lab = 1.5)
@@ -262,7 +262,7 @@ saveRDS(dge.filt3, file.path("results", "dge.filt.rds"))
 
 MA plots are used to detect intensity dependent biases, by comparing two groups of the dataset. Firstly, a global MA-plot is examined for normalized and non-normalized (Figure \@ref(fig:maPlotsGeneral)) and non-normalized data (Figure \@ref(fig:maPlotsGeneral2)) 
 
-```{r maPlotsGeneral, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="MA-plots of normalized data. Shows fold change in logarithmic scale in function of the average expression."}
+```{r maPlotsGeneral, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="MA-plots of normalized data. Shows fold change in logarithmic scale in function of the average expression."}
 dge$samples$group <- thca$type		  
 table(dge$samples$group)
 dge.filt3$samples$group <- thca.filt3$type
@@ -272,7 +272,7 @@ abline(h = 0, col = "darkblue", lwd = 2)
 abline(h = 0, col = "darkblue", lwd = 2)
 ```
 
-```{r maPlotsGeneral2, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="MA-plots of non-normalized data. Shows fold change (FC) in logarithmic scale in function of the average expression."}
+```{r maPlotsGeneral2, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="MA-plots of non-normalized data. Shows fold change (FC) in logarithmic scale in function of the average expression."}
 plotSmear(dge.filt3, lowess = TRUE, las = 1, cex.lab = 1.5, cex.axis = 1.2, cex.main=2.5,
           main = "Normalized data", xlab = "Average logCPM", ylab = "logFC: tumor-normal")
 abline(h = 0, col = "darkblue", lwd = 2)
@@ -282,7 +282,7 @@ In the non-normalized plot, we can observe there are lots of genes non different
 
 MA-plots of the normalized expression profiles for each tumor (Figure \@ref(fig:maPlotsTumor)) and normal (Figure \@ref(fig:maPlotsNormal)) samples sparately are then examined to look for anomalous expression profiles. 
 
-```{r maPlotsTumor, echo=FALSE, fig.height=36, fig.width=10, dpi=100, fig.cap="MA-plots for each tumor sample. Show fold change in logarithmic scale in function of the average expression"}
+```{r maPlotsTumor, echo=FALSE, fig.height=36, fig.width=10, fig.margin= TRUE, fig.align='center', dpi=100, fig.cap="MA-plots for each tumor sample. Show fold change in logarithmic scale in function of the average expression"}
 par(mfrow=c(22, 4), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "tumor"]
 dgetmp <- dge.filt3[, thca.filt3$type == "tumor"]
@@ -297,7 +297,7 @@ for (i in 1:ncol(setmp)) {
 }
 ```
 
-```{r maPlotsNormal, echo=FALSE, fig.height=18, fig.width=10, dpi=100, fig.cap="MA-plots for each normal sample. Show fold change in logarithmic scale in function of the average expression."}
+```{r maPlotsNormal, echo=FALSE, fig.height=18, fig.width=10, fig.margin= TRUE, fig.align='center', dpi=100, fig.cap="MA-plots for each normal sample. Show fold change in logarithmic scale in function of the average expression."}
 par(mfrow=c(9, 4), mar=c(4, 5, 3, 1))
 setmp <- thca.filt3[, thca.filt3$type == "normal"]
 dgetmp <- dge.filt3[, thca.filt3$type == "normal"]
@@ -330,7 +330,7 @@ saveRDS(dge.filt4, file.path("results", "dge.filt4.rds"))
 
 Once normalization is done, a Multidimensinal Scaling (MDS) plot (Figure \@ref(fig:MDS)), is performed in order to visualize possible anamoalous samples or clusters with distinctive features.
 
-```{r MDS, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="MDS plot. Shows tumor (blue) and normal (orange) samples grouped by fold change in logarithmic scale"}
+```{r MDS, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.align='center', fig.cap="MDS plot. Shows tumor (blue) and normal (orange) samples grouped by fold change in logarithmic scale"}
 plotMDS(dge.filt4, labels= as.character(thca.filt4$type), col = c("chocolate1", "skyblue")[as.integer(dge.filt4$samples$group)], cex = 0.7, cex.main=2.5, main ="Sample type MDS", xlab = "Leading logFC dim1", ylab = "Leading logFC dim2")
 legend("topleft", c("normal", "tumor"), fill = c("chocolate1", "skyblue"), inset = 0.05, cex = 0.7)
 ```
@@ -341,7 +341,7 @@ Moreover, in the normal samples cluster we can find several tumor samples. If we
 
 As we have previously reported, this type of cancer can have different incidence regarding to the gender of the patient. That way, we also perform a MDS plot (Figure \@ref(fig:MDS2)) of female and male samples in order to observe possible differential expression pattern.
 
-```{r MDS2, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="MDS of the samples according to its gender (male or female)."}
+```{r MDS2, fig.height=6, fig.width=12, out.width="800px", fig.margin= TRUE, fig.align='center', echo=FALSE, fig.cap="MDS of the samples according to its gender (male or female)."}
 plotMDS(dge.filt4, labels= as.character(thca.filt4$gender), col = c("salmon", "darkolivegreen3")[thca.filt4$gender], cex = 0.7, cex.main=2.5, main ="Sample type MDS", xlab = "Leading logFC dim1", ylab = "Leading logFC dim2")
 legend("topleft", c("Female", "Male"), fill = c("salmon", "darkolivegreen3"), inset = 0.5, cex = 1)
 ```
@@ -384,7 +384,7 @@ From the TCGA barcode, we can extract four possible surrogate variables that can
 table(data.frame(TYPE=thca.filt4$type, TSS=tss))
 ```
 
-```{r sampleClustering, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by TSS."}
+```{r sampleClustering, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by TSS."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -411,7 +411,7 @@ From the table, we can observed that normal tissues are usually under-represente
 table(data.frame(TYPE=thca.filt4$type, plate=plate))
 ```
 
-```{r sampleClustering2, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Plate."}
+```{r sampleClustering2, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Plate."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -438,7 +438,7 @@ Altough the table shows different distribution across plates, it is mainly due t
 table(data.frame(TYPE=thca.filt4$type, PA=portionanalyte))
 ```
 
-```{r sampleClustering3, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Portion Analytic."}
+```{r sampleClustering3, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Portion Analytic."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -465,7 +465,7 @@ This plot also does not show a significant clustering, so we also discard this v
 table(data.frame(TYPE=thca.filt4$type, SV=samplevial))
 ```
 
-```{r sampleClustering4, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Sample vial."}
+```{r sampleClustering4, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples by Sample vial."}
 logCPM <- cpm(dge.filt4, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
 sampleClustering <- hclust(d)
@@ -488,7 +488,7 @@ legend("topright", paste("Samplevial", sort(unique(batch)), levels(factor(sample
 
 From this plot, we can observe that there is a clustering of the samples according to samplevial, which can interfer with our outcome of interest. Moreover, we perform a MDS plot (Figure \@ref(fig:mdsPlot)) to visualize the dependency.
 
-```{r mdsPlot, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Multidimensional scaling plot of the samples. Shows clustering of samples by fold change in logarithmic scale, coloured by sample vial."}
+```{r mdsPlot, fig.height=6, fig.width=12, out.width="800px", fig.margin= TRUE, fig.align='center', echo=FALSE, fig.cap="Multidimensional scaling plot of the samples. Shows clustering of samples by fold change in logarithmic scale, coloured by sample vial."}
 plotMDS(dge.filt4, labels=outcome, col=batch, main ="Sample vial MDS", cex.main=2.5, xlab = "Leading logFC dim1", ylab = "Leading logFC dim2")
 legend("bottomleft", paste("Samplevial", sort(unique(batch)), levels(factor(samplevial))),
        fill=sort(unique(batch)), inset=0.05)

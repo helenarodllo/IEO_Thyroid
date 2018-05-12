@@ -45,7 +45,7 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
-```{r pdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
+```{r pdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples."}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
@@ -73,7 +73,7 @@ The number of differential expressed genes has increased to `r sum(p.adjust(pvsv
 
 Figure \@ref(fig:psvdist) shows the resulting distribution of adjusted p-values. More significant genes with FDR less than 1% can be observed.
 
-```{r psvdist, echo=FALSE, fig.height=6, fig.width=12, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
+```{r psvdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Distribution of raw p-values for an F-test on every gene between tumor and normal samples, adjusting for surrogate variables estimated with SVA."}
 hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
@@ -81,7 +81,7 @@ The distribution of adjusted p-values is very similar to raw ones, but we have m
 
 Once we have done a batch adjustement, we want to check (Figure \@ref(fig:sampleClusteringAdjust)) if our detected surrogate varible (samplevial) still has a confounding effect in our interested outcome variable.
 
-```{r sampleClusteringAdjust, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables."}
+```{r sampleClusteringAdjust, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables."}
 samplevial <- substr(colnames(thca.filt), 14, 16)
 logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 d <- as.dist(1-cor(logCPM, method="spearman"))
@@ -115,7 +115,7 @@ class(svdexp)
 dim(svdexp)
 ```
 
-```{r sampleClusteringRemov, fig.height=6, fig.width=12, out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering after removing samplevial effect."}
+```{r sampleClusteringRemov, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering after removing samplevial effect."}
 d <- as.dist(1 - cor(svdexp, method = "spearman"))
 sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
 ## for every node in the dendrogram if it is a leaf node
@@ -150,7 +150,7 @@ From the 9423 genes that have passed all previous filters, 7519 genes have a sig
 In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed in Figure \@ref(fig:VolcanoPlot), a widely used diagnostic
 plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes. Shows genes sorted by p-value in function of $\log_2$(fold change). Genes with a significant p-value are marked in orange, genes with a highl $\log_2$FC are marked in blue and genes with significant p-value and high $\log_2$FC are marked in gree."}
+```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes. Shows genes sorted by p-value in function of $\log_2$(fold change). Genes with a significant p-value are marked in orange, genes with a highl $\log_2$FC are marked in blue and genes with significant p-value and high $\log_2$FC are marked in gree."}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))
