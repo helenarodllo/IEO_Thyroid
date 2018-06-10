@@ -28,25 +28,17 @@ opts_chunk$set(cache=TRUE,
 
 thca <- readRDS(file.path("results", "thca.filt4.rds"))
 dge <- readRDS(file.path("results", "dge.filt4.rds"))
-DEgenes <- readRDS("DEgenes1.rds")
+DEgenes <- readRDS("DEgenes_paired.rds")
 ```
 
 ```{r}
 library(org.Hs.eg.db)
 library(GSEABase)
 #Separate up and down-regulated genes for genesets
-tumor <- DEgenes[DEgenes$LogFC > 0,]
-normal <- DEgenes[DEgenes$LogFC < 0,]
-DE_t <- GeneSet(EntrezIdentifier("org.Hs.eg.db"), geneIds = rownames(tumor), setName = "up tumor genes")
-DE_n <- GeneSet(EntrezIdentifier("org.Hs.eg.db"), geneIds = rownames(normal), setName = "up normal genes")
-details(DE_t)
-details(DE_n)
-DEsym_t <- mapIdentifiers(DE_t, SymbolIdentifier())
-DEsym_n <- mapIdentifiers(DE_n, SymbolIdentifier())
-DEsym_t
-DEsym_n
-diff <- setdiff(DEsym_t,DEsym_n)
-typeDEgenes <- DEsym_t | DEsym_n
+DE <- GeneSet(EntrezIdentifier("org.Hs.eg.db"), geneIds = rownames(DEgenes), setName = "DE tumor genes")
+details(DE)
+DEsym <- mapIdentifiers(DE, SymbolIdentifier())
+DEsym
 ```
 
 We can load an object for the Broad Gene Set C2, to add it into the GeneSetCollection object for the analysis.
@@ -56,7 +48,7 @@ library(GSVAdata)
 data(c2BroadSets)
 c2BroadSets <- c2BroadSets[c(grep("^KEGG", names(c2BroadSets)),
 grep("^REACTOME", names(c2BroadSets)), grep("^BIOCARTA", names(c2BroadSets)))]
-gsc <- GeneSetCollection(c(c2BroadSets, DE_t, DE_n))
+gsc <- GeneSetCollection(c(c2BroadSets, DE))
 gsc
 ```
 

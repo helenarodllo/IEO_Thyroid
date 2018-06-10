@@ -1,0 +1,86 @@
+---
+title: "FunctEnrich"
+author: "Lydia Fortea"
+date: "8/6/2018"
+output: pdf_document
+---
+
+```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
+library(knitr)
+library(SummarizedExperiment)
+library(edgeR)
+library(geneplotter)
+library(sva)
+library(corpcor)
+
+opts_chunk$set(cache=TRUE,
+               cache.path="cache/file2",
+               cache.extra=R.version.string,
+               autodep=TRUE,
+               fig.align="center",
+               comment="")
+
+thca <- readRDS(file.path("raw_counts", "seTHCA.rds"))
+dge <- readRDS(file.path("results", "dge.rds"))
+thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
+dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
+thca.filt <- readRDS(file.path("results", "thca.filt4.rds"))
+dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
+```
+
+# Functional Enrichment
+
+A popular kind of this analysis is a **Gene Ontology analysis** which corresponds to applying the one-tailed Fisher's exact test to every gene set in the GO database.
+
+We need first to download the annotated genes for humans, and declare the Gene Universe and the sudied DEgenes dataset.
+
+```{r}
+library(org.Hs.eg.db)
+allHumanGO <- select(org.Hs.eg.db, columns = "GO", key = keys(org.Hs.eg.db, keytype = "SYMBOL"), keytype = "SYMBOL")
+geneUniverse <- rownames(thca.filt)
+DEgenes <- readRDS("DEgenes_repmes.rds")
+```
+
+Analysis:
+
+```{r, message=FALSE, warning=FALSE}
+#parameter with all object
+library(GOstats)
+params <- new("GOHyperGParams", geneIds=rownames(DEgenes), universeGeneIds=geneUniverse, annotation="org.Hs.eg.db", ontology="BP", pvalueCutoff=0.05, testDirection="over")
+#run the analysis taking into account parent and child terms
+conditional(params) <- TRUE
+hgOver <- hyperGTest(params)
+#store and visualize results
+htmlReport(hgOver, file = "gocondtests.html")
+goresults <- summary(hgOver)
+head(goresults)
+```
+
+
+GO terms involving a few genes (e.g., < 3) in their size (m) and in their enrichment by DE genes (k) are likely to be less reliable than those that involve many genes. Likewise, large GO terms may provide little insight. That way, we need to filter results as follows:
+
+```{r}
+goresults <- goresults[goresults$Size >= 3 & goresults$Size <=300 & goresults$Count >= 3, ]
+goresults <- goresults[order(goresults$OddsRatio, decreasing=TRUE), ]
+head(goresults)
+dim(goresults)
+```
+
+Extract genes that enrich each GO term
+
+```{r, message=FALSE, warning=FALSE}
+geneIDs <- geneIdsByCategory(hgOver)[goresults$GOBPID]
+geneSYMs <- sapply(geneIDs, function(id) select(org.Hs.eg.db, columns = "SYMBOL", key = id,
+keytype = "ENTREZID")$SYMBOL)
+geneSYMs <- sapply(geneSYMs, paste, collapse = ", ")
+goresults <- cbind(goresults, Genes = geneSYMs)
+rownames(goresults) <- 1:nrow(goresults)
+```
+
+Export results
+
+```{r}
+library(xtable)
+xtab <- xtable(goresults, align = "l|c|r|r|r|r|r|p{3cm}|p{3cm}|")
+print(xtab, file = "goresults.html", type = "html")
+```
