@@ -21,8 +21,8 @@ opts_chunk$set(cache=TRUE,
 
 thca <- readRDS(file.path("raw_counts", "seTHCA.rds"))
 dge <- readRDS(file.path("results", "dge.rds"))
-thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
-dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
+#thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
+#dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
 thca.filt <- readRDS(file.path("results", "thca.filt4.rds"))
 dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
 ```
@@ -141,10 +141,10 @@ Now that we have normalized and adjust out data, we can obtain the truly differe
 ```{r genes}
 tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
 norExp <- rowMeans(logCPM[, thca.filt$type == "normal"])
-log2fc <- norExp - tumExp
+log2fc <- norExp - tumExpg
 ranking <- order(abs(log2fc), decreasing = TRUE)
 genes <- data.frame(LogFC = round(log2fc[ranking], digits = 3), PValue = round(pvsv, digits = 3), 
-                    row.names = rowData(thca.filt)$symbol[ranking], check.names = FALSE)
+                    Symbol = rowData(thca.filt)$symbol, row.names = rownames(thca.filt)[ranking], check.names = FALSE)
 genes$FDRcutoff <- (1:nrow(genes) * 0.05)/nrow(genes)
 genes$FDRpval <- p.adjust(genes$PValue, method = "fdr")
 head(genes)
@@ -172,10 +172,213 @@ As we are only interested in genes painted in green, there is a need to filter t
 maskfdr <- genes$FDRpval < 0.01
 maskfc <- genes$LogFC < -2.5 | genes$LogFC > 2.5
 genes.DE <- genes[maskfdr & maskfc, ]
-genes.DE
+saveRDS(genes.DE, file="DEgenes1.rds")
 ```
 
-A prior bibliographic search if the resulting genes was performed, those genes are verified to be mostly related with thyroid carcinome.
+## Linear Reggression Model with limma-voom
+
+Linear Regression Models can be performd with limmma in two ways: trend and voom
+
+Create the design matrix, using aa reference model the normal tissue, adjusting the matrix for unknown covariates. Then fit the linear regression model. Calculate moderated t-statistics and output results.
+
+```{r}
+library(sva)
+mod <- model.matrix(~type, colData(thca.filt))
+mod0 <- model.matrix(~1, colData(thca.filt))
+sv <- sva(assays(thca.filt)$logCPM, mod = mod, mod0 = mod0)
+sv$n
+mod <- cbind(mod, sv$sv)
+colnames(mod) <- c(colnames(mod)[1:2], paste0("SV", 1:sv$n))
+```
+
+We plot the relationship between mean and variance in our dataset.
+
+```{r}
+v <- voom(dge.filt, mod, plot=TRUE)
+```
+
+As we can observe, there is some correlation between mean and variance, so we need to adjust them using limma-voom.
+
+```{r}
+fit <- lmFit(v, mod)
+fit <- eBayes(fit)
+res <- decideTests(fit, p.value=FDRcutoff, lfc = 2.5)
+summary(res)
+#add metadata
+genesmd <- data.frame(chr =as.character(seqnames(rowRanges(thca.filt))), symbol = rowData(thca.filt)[,1], stringsAsFactors = FALSE)
+FDRcutoff <- 0.01
+fit$genes <- genesmd
+DEgenes_voom <- topTable(fit, coef=2, n=Inf, lfc = 2.5)
+head(DEgenes_voom)
+sort(table(DEgenes_voom$chr[DEgenes_voom$adj.P.Val < FDRcutoff]), decreasing = TRUE)
+```
+
+We get now 88 up-regulated genes in tumor, and 36 down-regulated. The chromosomes with more dis-regulated genes were 1 and 19, with 15 and 12 DE gene, respectively.
+
+### Visualizing results
+
+**Histogram**
+
+```{r}
+hist(fit$p.value, xlab = "Raw P-values", main = "", las = 1)
+```
+
+**Volcano Plot**
+
+```{r}
+volcanoplot(fit, coef = 2, highlight = 7, names = fit$genes$symbol, main = "Model 2",
+las = 1)
+with(subset(DEgenes_voom, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
+abline(h=-log10(max(DEgenes_voom$P.Value[DEgenes_voom$adj.P.Val <= 0.05])), lty=2, col="red")
+```
+
+**MA-plot**
+
+```{r}
+top7 <- order(fit$lods[, 2], decreasing = TRUE)[1:7]
+limma::plotMA(fit, coef = 2, status = rownames(fit$lods) %in% DEgenes_voom, legend = FALSE,
+main = "Model 2", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
+text(fit$Amean[top7], fit$coef[top7, 2], fit$genes$symbol[top7], cex = 0.5, pos = 4)
+```
+
+Save Results:
+
+```{r}
+saveRDS(DEgenes3, "DEgenes_voom.rds")
+```
+
+We check the number of samples we have for each individuals:
+
+```{r}
+sample_id <- substr(colnames(thca.filt), 9, 12)
+colData(thca.filt)$sample_id <- factor(sample_id)
+pair_table <- table(thca.filt$sample_id)
+table(table(thca.filt$sample_id))
+```
+
+We observe that we have 44 individuals with tummor and normal samples. That way, we are going to perform a Paired Design with the data of these individuals.
+
+#### Paired Design
+
+We need first to get only the data for those paired samples
+
+```{r}
+matrix <- as.matrix(pair_table)
+mask <- matrix[,1] == 2
+matrix <- matrix[mask, ]
+mask2 <- thca.filt$sample_id %in% names(matrix)
+thca.paired <- thca.filt[, mask2]
+dge.paired <- dge.filt[, mask2]
+saveRDS(thca.paired, "thca_paired_design.rds")
+saveRDS(dge.paired, "dge_paired_design.rds")
+```
+
+Fitting the sva voom model to paired sample
+
+```{r, message=FALSE, warning=FALSE}
+thca.paired$type <- droplevels(thca.paired$type)
+thca.paired$sample_id <- droplevels(thca.paired$sample_id)
+modp <- model.matrix(~type + sample_id, colData(thca.paired))
+mod0 <- model.matrix(~1, colData(thca.paired))
+#sv <- sva(assays(thca.paired)$logCPM, mod = modp, mod0 = mod0)
+sv$n
+modp <- cbind(modp, sv$sv)
+fit2 <- lmFit(assays(thca.paired)$logCPM, modp)
+fit2 <- eBayes(fit2, trend=TRUE)
+FDRcutoff <- 0.01
+res2 <- decideTests(fit2, p.value = FDRcutoff, lfc= 2.5)
+summary(res2)
+fit2$genes <- genesmd
+DEgenes_paired <- topTable(fit2, coef=2, n=Inf, lfc= 2.5)
+sort(table(DEgenes_paired$chr[DEgenes_paired$adj.P.Val < FDRcutoff]), decreasing = TRUE)
+```
+
+With this analysis, we get 20 up-regulated genes in tumor samples and 4 down-regulated. We observe that crh1 is the most differenttial expressed chromosome, with 5 DE genes.
+
+**Histogram**
+
+```{r}
+hist(fit2$p.value, xlab = "Raw P-values", main = "", las = 1)
+```
+
+**Volcano plot**
+
+```{r}
+volcanoplot(fit2, coef = 2, highlight = 7, names = fit2$genes$symbol, main = "Model 3")
+with(subset(DEgenes_paired, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
+```
+
+**MA-plot**
+
+```{r}
+top7 <- order(fit2$lods[, 2], decreasing = TRUE)[1:7]
+limma::plotMA(fit2, coef = 2, status = rownames(fit2$lods) %in% DEgenes_paired, legend = FALSE, main = "Model 3", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
+text(fit2$Amean[top7], fit2$coef[top7, 2], fit2$genes$symbol[top7], cex = 0.5, pos = 4)
+```
+
+
+```{r}
+saveRDS(DEgenes_paired, file="DEgenes_paired.rds")
+```
+
+#### Repeated Measures
+
+As we don't have too many samples for paired design, we are also going to perform a repeated measured analaysis in order to compare both results.
+
+```{r}
+corfit <- duplicateCorrelation(assays(thca.filt)$logCPM, mod, block = thca.filt$sample_id)
+corfit$consensus
+```
+
+We find that the correlation is large enough to be considered in the analysis
+
+```{r}
+fit3 <- lmFit(assays(thca.filt)$logCPM, mod, block = thca.filt$sample_id, correlation = corfit$consensus)
+fit3 <- eBayes(fit3, trend = TRUE)
+res3 <- decideTests(fit3, p.value = FDRcutoff, lfc = 2.5)
+summary(res3)
+fit3$genes <- genesmd
+DEgenes_repmes <- topTable(fit3, coef = 2, n = Inf, lfc = 2.5)
+head(DEgenes_repmes)
+sort(table(DEgenes_repmes$chr[DEgenes_repmes$adj.P.Val < FDRcutoff]), decreasing = TRUE)
+```
+
+We get 87 up-regulated genes in tumor and 37 down-regulated. 
+
+```{r}
+saveRDS(DEgenes_repmes, file="DEgenes_repmes.rds")
+```
+
+**Histogram**
+
+```{r}
+hist(fit3$p.value, xlab = "Raw P-values", main = "", las = 1)
+```
+
+**Volcano Plot**
+
+```{r}
+volcanoplot(fit3, coef = 2, highlight = 7, names = fit3$genes$symbol, main = "Model 3")
+with(subset(DEgenes_repmes, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
+```
+
+**MA-plot**
+
+```{r}
+top7 <- order(fit3$lods[, 2], decreasing = TRUE)[1:7]
+limma::plotMA(fit3, coef = 2, status = rownames(fit3$lods) %in% DEgenes_repmes, legend = FALSE, main = "Model 3", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
+text(fit3$Amean[top7], fit3$coef[top7, 2], fit3$genes$symbol[top7], cex = 0.5, pos = 4)
+```
+
+We check the intersection between the three obtained DE gene sets
+
+```{r}
+length(intersect(rownames(DEgenes_repmes), rownames(DEgenes_paired)))
+length(setdiff(rownames(DEgenes_repmes), rownames(DEgenes_paired)))
+length(setdiff(rownames(DEgenes_paired), rownames(DEgenes_repmes)))
+```
+
+As we have saw, tha most of the samples obtained with paired samples, also are obtained with repeated measures. Moreover, as we have adjusted our model regarding paired samples, removing the interpersonal variabilty, those results are more reliable for continuing the analysis.
 
 ## Session information
 
