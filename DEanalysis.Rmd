@@ -1,7 +1,8 @@
 ---
 output:
-  bookdown::gitbook: default
-  bookdown::pdf_book: default
+  output: html_document
+  #bookdown::gitbook: default
+  #bookdown::pdf_book: default
 ---
 
 ```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
@@ -21,17 +22,24 @@ opts_chunk$set(cache=TRUE,
 
 thca <- readRDS(file.path("raw_counts", "seTHCA.rds"))
 dge <- readRDS(file.path("results", "dge.rds"))
-#thca.filt.unnorm <- readRDS(file.path("results", "thca.filt.unnorm.rds"))
-#dge.filt.unnorm <- readRDS(file.path("results", "dge.filt.unnorm.rds"))
 thca.filt <- readRDS(file.path("results", "thca.filt4.rds"))
 dge.filt <- readRDS(file.path("results", "dge.filt4.rds"))
 ```
 
 # Differential expression
 
-As it has seen in batch identification, there is a cluster of the dataset regarding to the samplevial, which can be confunding with the outcome of interest. Samplevial variable has 5 states with different and no-uniform sample sizes for each one, and we have a small dataset so we can not adjust the data for this batch. 
+As it has seen in batch identification, there is a cluster of the dataset regarding to the samplevial, which can be confunding with the outcome of interest. Samplevial variable has 5 states with different and no-uniform sample sizes for each one; however, as more of the states has very few samples, we are going to remove those samples from our dataset.
 
-That way, a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
+```{r samplevial}
+samplevial <- substr(colnames(thca.filt), 14, 16)
+mask <- samplevial == "01A" | samplevial == "11A"
+thca.filt <- thca.filt[, mask]
+dge.filt <- dge.filt[, mask]
+saveRDS(thca.filt, "thca_filt.rds")
+saveRDS(dge.filt, "dge_filt.rds")
+```
+
+Once we have filtered our data regarding to samplevial, we have 452 samples to analyze. However, there can be more counfounding factors that affect our results, so a simple examination of expression changes and their associated p-values is going to be performed in order to try to capture sources of heterogeneity, such as non-biological variability, on the filtered and normalized dataset.
 
 First of all, the number of significant differential expressed genes is calculated, this is done without any batch adjustment. The false discovery rate (FDR) approach is used to perform this calculation as some false positives can be accepted in this studie, the aim is to be more laxe.
 
@@ -45,7 +53,7 @@ sum(p.adjust(pv, method="fdr") < 0.01)
 There are `r sum(p.adjust(pv, method="fdr") < 0.01)` genes changing significantly
 their expression at FDR < 1%. The distribution of the resulting p-values is shown in Figure \@ref(fig:pdist).
 
-```{r pdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Distribution of p-values. Raw p-values for an F-test on every gene between tumor and normal samples."}
+```{r pdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, fig.cap="Distribution of p-values. Raw p-values for an F-test on every gene between tumor and normal samples."}
 hist(pv, main="Histogram before batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
@@ -57,7 +65,6 @@ The following step is to estimate surrogate variables by the surrogate variable 
 assays(thca.filt)$logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
 sv <- sva(assays(thca.filt)$logCPM, mod, mod0)
 sv$n
-names(sv)
 ```
 
 `r sv$n` surrogate variables are found, so the extent of differential expression is assessed adjusting for the.
@@ -73,75 +80,18 @@ The number of differential expressed genes has increased to `r sum(p.adjust(pvsv
 
 Figure \@ref(fig:psvdist) shows the resulting distribution of adjusted p-values. More significant genes with FDR less than 1% can be observed.
 
-```{r psvdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Distribution of adjusted p-values. P-values for an F-test on every gene between tumor and normal samples, <br> adjusting for surrogate variables estimated with SVA."}
+```{r psvdist, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, fig.cap="Distribution of adjusted p-values. P-values for an F-test on every gene between tumor and normal samples, <br> adjusting for surrogate variables estimated with SVA."}
 hist(pvsv, main="Histogram after batch adjustment", col = "skyblue", las=1, xlab="p-values", ylab = "Frequency")
 ```
 
 The distribution of adjusted p-values is very similar to raw ones, but we have more significant genes than before.
 
-Once we have done a batch adjustement, we want to check (Figure \@ref(fig:sampleClusteringAdjust)) if our detected surrogate varible (samplevial) still has a confounding effect in our interested outcome variable.
-
-```{r sampleClusteringAdjust, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering of the samples after adjusting for surrogate variables."}
-samplevial <- substr(colnames(thca.filt), 14, 16)
-logCPM <- cpm(dge.filt, log=TRUE, prior.count=3)
-d <- as.dist(1-cor(logCPM, method="spearman"))
-sampleClustering <- hclust(d)
-batch <- as.integer(factor(samplevial))
-sampleDendrogram <- as.dendrogram(sampleClustering, hang=0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- as.character(thca.filt$type)
-names(outcome) <- colnames(thca.filt)
-sampleDendrogram <- dendrapply(sampleDendrogram,
-                               function(x, batch, labels) {
-                                 if (is.leaf(x)) {
-                                   attr(x, "nodePar") <- list(lab.col=as.vector(batch[attr(x, "label")]))
-                                   attr(x, "label") <- as.vector(labels[attr(x, "label")])
-                                 }
-                                 x
-                               }, batch, outcome)
-plot(sampleDendrogram, main="Hierarchical clustering of samples")
-legend("topright", paste("Vial", sort(unique(batch)), levels(factor(samplevial))), fill=sort(unique(batch)))
-```
-
-It can be observed that there are still two clusters due to the surrogate variable, samplevial. The batch adjustement by SVA had no effect for this variable, so we are going to use an agressive strategy called *Singular Value Decomposition (SVD)* in order to remove this batch effect. Results would be again visualized with a Hierarchical Clustering (Figure \@ref(fig:sampleClusteringRemov)). 
-
-```{r svd}
-s <- fast.svd(t(scale(t(logCPM), center = TRUE, scale = TRUE)))
-pcSds <- s$d
-pcSds[1] <- 0
-svdexp <- s$u %*% diag(pcSds) %*% t(s$v)
-colnames(svdexp) <- colnames(thca.filt)
-class(svdexp)
-dim(svdexp)
-```
-
-```{r sampleClusteringRemov, fig.height=6, fig.width=12, fig.margin= TRUE, fig.align='center', out.width="800px", echo=FALSE, fig.cap="Hierarchical clustering after removing samplevial effect."}
-d <- as.dist(1 - cor(svdexp, method = "spearman"))
-sampleClustering <- hclust(d)
-sampleDendrogram <- as.dendrogram(sampleClustering, hang = 0.1)
-names(batch) <- colnames(thca.filt)
-outcome <- as.character(thca.filt$type)
-names(outcome) <- colnames(thca.filt)
-sampleDendrogram <- dendrapply(sampleDendrogram, function(x, batch, labels) {
-## for every node in the dendrogram if it is a leaf node
-if (is.leaf(x)) {
-attr(x, "nodePar") <- list(lab.col = as.vector(batch[attr(x, "label")])) ## color by batch
-attr(x, "label") <- as.vector(labels[attr(x, "label")]) ## label by outcome
-}
-x
-}, batch, outcome) ## these are the second and third arguments in the function
-plot(sampleDendrogram, main = "Hierarchical clustering of samples")
-legend("topright", paste("Batch", sort(unique(batch))), fill = sort(unique(batch)))
-```
-
-After SVD,removing the batch effect of sample vial is been achieved succesfully, in order to avoid counfunding results in the outcome of interest.
-
 Now that we have normalized and adjust out data, we can obtain the truly differentially expressed genes between tumor and normal samples with significant logFC and p-value.
 
 ```{r genes}
-tumExp <- rowMeans(logCPM[, thca.filt$type == "tumor"])
-norExp <- rowMeans(logCPM[, thca.filt$type == "normal"])
-log2fc <- norExp - tumExpg
+tumExp <- rowMeans(assays(thca.filt)$logCPM[, thca.filt$type == "tumor"])
+norExp <- rowMeans(assays(thca.filt)$logCPM[, thca.filt$type == "normal"])
+log2fc <- norExp - tumExp
 ranking <- order(abs(log2fc), decreasing = TRUE)
 genes <- data.frame(LogFC = round(log2fc[ranking], digits = 3), PValue = round(pvsv, digits = 3), 
                     Symbol = rowData(thca.filt)$symbol, row.names = rownames(thca.filt)[ranking], check.names = FALSE)
@@ -152,10 +102,9 @@ head(genes)
 
 From the 9423 genes that have passed all previous filters, 7519 genes have a significant p-value (< 0.01), but they are not all differentially expressed genes because several ones have a logFC close to 0 which means that there is not differnece between groups. 
 
-In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed in Figure \@ref(fig:VolcanoPlot), a widely used diagnostic
-plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
+In order to have a visual idea of the differential expressed genes, a *Volcano Plot* is performed in Figure \@ref(fig:VolcanoPlot), a widely used diagnostic plot in DE analysis, in order to assess the extent of DE by plotting the raw p-values as function of their fold-changes, both in logarithmic scale.
 
-```{r VolcanoPlot, fig.height=8, fig.width=12, out.width="800px", fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes. Shows genes sorted by p-value in function of log2FC. <br> Genes with a significant p-value are marked in orange, genes with a highl log2FC are marked in blue <br> and genes with significant p-value and high log2FC are marked in gree."}
+```{r VolcanoPlot, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Volcano Plot of normalized genes. Shows genes sorted by p-value in function of log2FC. <br> Genes with a significant p-value are marked in orange, genes with a highl log2FC are marked in blue <br> and genes with significant p-value and high log2FC are marked in gree."}
 plot(genes$LogFC, -log10(genes$PValue), pch=".", cex=3, xlab="Log 2 fold-change", ylab="-Log 10 p-value", las=1, main="Volcano Plot")
 # Add colored points: red if padj<0.05, orange of log2FC>1, green if both)
 with(subset(genes, PValue < .05 ), points(LogFC, -log10(PValue),pch=20, col="chocolate1"))
@@ -175,14 +124,13 @@ genes.DE <- genes[maskfdr & maskfc, ]
 saveRDS(genes.DE, file="DEgenes1.rds")
 ```
 
-## Linear Reggression Model with limma-voom
+## Linear Reggression Model
 
-Linear Regression Models can be performd with limmma in two ways: trend and voom
+Another way to find differentially expressed genes within a dataset is with *Linear Regression Models*, which captures linear relationship between expression values and the effect of the experiment.
 
-Create the design matrix, using aa reference model the normal tissue, adjusting the matrix for unknown covariates. Then fit the linear regression model. Calculate moderated t-statistics and output results.
+For that, we can use the *limma pipeline* and adjusted for unknown covariates. For that, we need to create a design matrix, using normal samples as reference model, adjust the matrix for unknown covariates, fit the linear regression model and calculate moderated t-statistics to get significant output results.
 
-```{r}
-library(sva)
+```{r designmatrix}
 mod <- model.matrix(~type, colData(thca.filt))
 mod0 <- model.matrix(~1, colData(thca.filt))
 sv <- sva(assays(thca.filt)$logCPM, mod = mod, mod0 = mod0)
@@ -191,78 +139,80 @@ mod <- cbind(mod, sv$sv)
 colnames(mod) <- c(colnames(mod)[1:2], paste0("SV", 1:sv$n))
 ```
 
-We plot the relationship between mean and variance in our dataset.
+There are two different analysis with limma: *trend and voom*. In order to figure out which method is the best, we have to check if there is a relationship between mean and variance in our dataset that can biases our results. It is shown in Figure \@ref{fig:mean-var}.
 
-```{r}
+```{r mean-var, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Mean-variance Trend. Shows the relationship between mean and variance of the expression levels in our dataset"}
 v <- voom(dge.filt, mod, plot=TRUE)
 ```
 
-As we can observe, there is some correlation between mean and variance, so we need to adjust them using limma-voom.
+This plot shows some correlation between mean and variance, indicating that we have to adjust the linear regression model using *limma-voom*.
 
-```{r}
-fit <- lmFit(v, mod)
-fit <- eBayes(fit)
-res <- decideTests(fit, p.value=FDRcutoff, lfc = 2.5)
-summary(res)
-#add metadata
-genesmd <- data.frame(chr =as.character(seqnames(rowRanges(thca.filt))), symbol = rowData(thca.filt)[,1], stringsAsFactors = FALSE)
-FDRcutoff <- 0.01
-fit$genes <- genesmd
-DEgenes_voom <- topTable(fit, coef=2, n=Inf, lfc = 2.5)
-head(DEgenes_voom)
-sort(table(DEgenes_voom$chr[DEgenes_voom$adj.P.Val < FDRcutoff]), decreasing = TRUE)
-```
+Another aspect to take into account when we perform a linear regression analysis is the paired samples, we can have both types of samples (tumor and normal) for several individuals, which can biases our results. We can handle this problemn in two different ways: *Paired design* and *Adjusting for repeated measures*.
 
-We get now 88 up-regulated genes in tumor, and 36 down-regulated. The chromosomes with more dis-regulated genes were 1 and 19, with 15 and 12 DE gene, respectively.
-
-### Visualizing results
-
-**Histogram**
-
-```{r}
-hist(fit$p.value, xlab = "Raw P-values", main = "", las = 1)
-```
-
-**Volcano Plot**
-
-```{r}
-volcanoplot(fit, coef = 2, highlight = 7, names = fit$genes$symbol, main = "Model 2",
-las = 1)
-with(subset(DEgenes_voom, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
-abline(h=-log10(max(DEgenes_voom$P.Value[DEgenes_voom$adj.P.Val <= 0.05])), lty=2, col="red")
-```
-
-**MA-plot**
-
-```{r}
-top7 <- order(fit$lods[, 2], decreasing = TRUE)[1:7]
-limma::plotMA(fit, coef = 2, status = rownames(fit$lods) %in% DEgenes_voom, legend = FALSE,
-main = "Model 2", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
-text(fit$Amean[top7], fit$coef[top7, 2], fit$genes$symbol[top7], cex = 0.5, pos = 4)
-```
-
-Save Results:
-
-```{r}
-saveRDS(DEgenes3, "DEgenes_voom.rds")
-```
-
-We check the number of samples we have for each individuals:
-
-```{r}
+```{r sample_id}
 sample_id <- substr(colnames(thca.filt), 9, 12)
 colData(thca.filt)$sample_id <- factor(sample_id)
 pair_table <- table(thca.filt$sample_id)
 table(table(thca.filt$sample_id))
 ```
 
-We observe that we have 44 individuals with tummor and normal samples. That way, we are going to perform a Paired Design with the data of these individuals.
+We observe that there are 42 individuals from which we have tummor and normal samples, and 368 un-paired samples. As we have much more unpaired samples but enough paired ones for a Paired Design, we are going to perform both analysis and compare the results; to check which is more reliable.
 
-#### Paired Design
+### Limma-voom for repeated measures
 
-We need first to get only the data for those paired samples
+First of all, we need to compute the correlation coefficient to check the influence of the repeated measures in our dataset.
 
-```{r}
+```{r repmes}
+corfit <- duplicateCorrelation(assays(thca.filt)$logCPM, mod, block = thca.filt$sample_id)
+corfit$consensus
+```
+
+The correlation coefficient of `r corfit$consensus` verifies that the relationship is large enough to be taken into account in our regression model.
+
+```{r limma-voom}
+FDRcutoff <- 0.01
+fit <- lmFit(v, mod, block = thca.filt$sample_id, correlation = corfit$consensus)
+fit <- eBayes(fit, trend=TRUE)
+res <- decideTests(fit, p.value=FDRcutoff, lfc = 2.5)
+summary(res)
+#add metadata
+genesmd <- data.frame(chr =as.character(seqnames(rowRanges(thca.filt))), symbol = rowData(thca.filt)[,1], stringsAsFactors = FALSE)
+fit$genes <- genesmd
+DEgenes_repmes <- topTable(fit, coef=2, n=Inf, lfc = 2.5)
+head(DEgenes_repmes)
+sort(table(DEgenes_repmes$chr[DEgenes_repmes$adj.P.Val < FDRcutoff]), decreasing = TRUE)
+saveRDS(DEgenes_repmes, "DEgenes_repmes.rds")
+```
+
+From limma-voom results adjusted for unknown covariated and repeated measures, we obtain *85 up-regulated* and *39 down-regulated* genes in tumor samples. Most of the DE genes are located in chromosomes 1, 19 and 5, with 16, 11 and 10 genes, respectively.
+
+We perform several diagnostic plots such as *Histogram of raw p-values and Volcano Plot* to check the reliability of the results, showed in Figures \@ref{fig:pdist2} anddim \@ref{fig:VolcanoPlot2}.
+
+```{r pdist2, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Distribution of raw p-values of limma-voom results. P-values for a Linear Regression Model on every gene between tumor and normal samples, <br> adjusting for surrogate variables estimated with SVA, repeated measures and mean-variance trend with limma-voom"}
+hist(fit$p.value, xlab = "Raw P-values", ylab = "Frequency", main = "Raw P-values Distribution", las = 1, col="skyblue")
+```
+
+```{r VolcanoPlot2, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Volcano Plot for limma-voom results. Shows genes sorted by p-value in function of log2FC. <br> Genes with significant p-value and high log2FC are labeled and marked in green."}
+volcanoplot(fit, coef = 2, highlight = 7, names = fit$genes$symbol, main = "Volcano Plot", las = 1)
+with(subset(DEgenes_repmes, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
+abline(h=-log10(max(DEgenes_repmes$P.Value[DEgenes_repmes$adj.P.Val <= 0.05])), lty=2, col="red")
+```
+
+From Histogram \@ref{fig:pvhist}, we can observe an almost uniform distribution of raw p-values for non differentially expressed genes. From the Volcano \@ref{fig:VolcanoPlot2}, we observe that most of the genes are located near to zero and the statistically significant genes labeled and coloured in green.
+
+The Top 10 up-regulated genes for tumor samples in this analysis are shown in the next table:
+
+```{r top10_repmes}
+head(DEgenes_repmes[order(DEgenes_repmes$logFC, decreasing = TRUE), ], n=10)
+```
+
+### Paired Design
+
+In this analysis, we only analyze the expression data for those individuals from which we have tumor and normal samples. This design combined with limma-voom pipeline usually provides more reliable results as it adjust for intra-variability.
+
+We first need to get only the paired samples from our dataset, and perform the same steps as we did before.
+
+```{r datapaired}
 matrix <- as.matrix(pair_table)
 mask <- matrix[,1] == 2
 matrix <- matrix[mask, ]
@@ -273,112 +223,58 @@ saveRDS(thca.paired, "thca_paired_design.rds")
 saveRDS(dge.paired, "dge_paired_design.rds")
 ```
 
-Fitting the sva voom model to paired sample
+In this analysis, we need to set a FDRcutoff less strict as we are dealing with few samples.
 
-```{r, message=FALSE, warning=FALSE}
+```{r pairedvoom, message=FALSE, warning=FALSE}
 thca.paired$type <- droplevels(thca.paired$type)
 thca.paired$sample_id <- droplevels(thca.paired$sample_id)
 modp <- model.matrix(~type + sample_id, colData(thca.paired))
 mod0 <- model.matrix(~1, colData(thca.paired))
-#sv <- sva(assays(thca.paired)$logCPM, mod = modp, mod0 = mod0)
+sv <- sva(assays(thca.paired)$logCPM, mod = modp, mod0 = mod0)
 sv$n
 modp <- cbind(modp, sv$sv)
 fit2 <- lmFit(assays(thca.paired)$logCPM, modp)
 fit2 <- eBayes(fit2, trend=TRUE)
-FDRcutoff <- 0.01
-res2 <- decideTests(fit2, p.value = FDRcutoff, lfc= 2.5)
+FDRcutoff <- 0.1
+res2 <- decideTests(fit2, p.value = FDRcutoff, lfc = 2.5)
 summary(res2)
 fit2$genes <- genesmd
-DEgenes_paired <- topTable(fit2, coef=2, n=Inf, lfc= 2.5)
+DEgenes_paired <- topTable(fit2, coef=2, n=Inf, lfc = 2.5)
 sort(table(DEgenes_paired$chr[DEgenes_paired$adj.P.Val < FDRcutoff]), decreasing = TRUE)
-```
-
-With this analysis, we get 20 up-regulated genes in tumor samples and 4 down-regulated. We observe that crh1 is the most differenttial expressed chromosome, with 5 DE genes.
-
-**Histogram**
-
-```{r}
-hist(fit2$p.value, xlab = "Raw P-values", main = "", las = 1)
-```
-
-**Volcano plot**
-
-```{r}
-volcanoplot(fit2, coef = 2, highlight = 7, names = fit2$genes$symbol, main = "Model 3")
-with(subset(DEgenes_paired, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
-```
-
-**MA-plot**
-
-```{r}
-top7 <- order(fit2$lods[, 2], decreasing = TRUE)[1:7]
-limma::plotMA(fit2, coef = 2, status = rownames(fit2$lods) %in% DEgenes_paired, legend = FALSE, main = "Model 3", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
-text(fit2$Amean[top7], fit2$coef[top7, 2], fit2$genes$symbol[top7], cex = 0.5, pos = 4)
-```
-
-
-```{r}
 saveRDS(DEgenes_paired, file="DEgenes_paired.rds")
 ```
 
-#### Repeated Measures
+With this analysis, we get 11 up-regulated and 4 down-regulated genes in tumor samples. We observe that all chromosomes has the same number of DE genes, which are not a very trustful results as it can be due to chance.
 
-As we don't have too many samples for paired design, we are also going to perform a repeated measured analaysis in order to compare both results.
+We perform the same diagnostic plot as before to check the reliability of the results, showed in Figures \@ref{fig:pdist3} and \@ref{fig:VolcanoPlot3}.
 
-```{r}
-corfit <- duplicateCorrelation(assays(thca.filt)$logCPM, mod, block = thca.filt$sample_id)
-corfit$consensus
+```{r pdist3, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Distribution of raw p-values of limma-voom results. P-values for a Linear Regression Model on every gene between tumor and normal samples, <br> Paired Design adjusting for surrogate variables estimated with SVAand mean-variance trend with limma-voom"}
+hist(fit2$p.value, xlab = "Raw P-values", main = "Raw P-values Distribution", las = 1, col="skyblue")
 ```
 
-We find that the correlation is large enough to be considered in the analysis
-
-```{r}
-fit3 <- lmFit(assays(thca.filt)$logCPM, mod, block = thca.filt$sample_id, correlation = corfit$consensus)
-fit3 <- eBayes(fit3, trend = TRUE)
-res3 <- decideTests(fit3, p.value = FDRcutoff, lfc = 2.5)
-summary(res3)
-fit3$genes <- genesmd
-DEgenes_repmes <- topTable(fit3, coef = 2, n = Inf, lfc = 2.5)
-head(DEgenes_repmes)
-sort(table(DEgenes_repmes$chr[DEgenes_repmes$adj.P.Val < FDRcutoff]), decreasing = TRUE)
+```{r VolcanoPlot3, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Volcano Plot for limma-voom results with paired design. Shows genes sorted by p-value in function of log2FC. <br> Genes with significant p-value and high log2FC are labeled and marked in green."}
+volcanoplot(fit2, coef = 2, highlight = 7, names = fit2$genes$symbol, main = "Volcano Plot", las = 1)
+with(subset(DEgenes_paired, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
+abline(h=-log10(max(DEgenes_paired$P.Value[DEgenes_paired$adj.P.Val <= 0.05])), lty=2, col="red")
 ```
 
-We get 87 up-regulated genes in tumor and 37 down-regulated. 
 
-```{r}
-saveRDS(DEgenes_repmes, file="DEgenes_repmes.rds")
+From Histogram \@ref{fig:pdist3}, we can observe a tailed distribution for p-values od non-DE genes, with higher frequency as before. The Volcano \@ref{fig:VolcanoPlot3}, weis similar to the previous one, but with less statistically significant genes labeled in green.
+
+We get the Top 10 up-regulated genes in tumor samples for Paired Design
+
+```{r top10_pair}
+head(DEgenes_paired[order(DEgenes_paired$logFC, decreasing = TRUE), ], n=10)
 ```
 
-**Histogram**
+We have obtained 129 and 13 differential expressed genes for Repeated Measures and Paired Design, respectively. There is an important difference between them, so we are going to check if those significant genes in paired analysis are also include in the other.
 
-```{r}
-hist(fit3$p.value, xlab = "Raw P-values", main = "", las = 1)
-```
-
-**Volcano Plot**
-
-```{r}
-volcanoplot(fit3, coef = 2, highlight = 7, names = fit3$genes$symbol, main = "Model 3")
-with(subset(DEgenes_repmes, P.Value<.01 & abs(logFC)>2.5), points(logFC, -log10(P.Value), pch=20, col="darkolivegreen2"))
-```
-
-**MA-plot**
-
-```{r}
-top7 <- order(fit3$lods[, 2], decreasing = TRUE)[1:7]
-limma::plotMA(fit3, coef = 2, status = rownames(fit3$lods) %in% DEgenes_repmes, legend = FALSE, main = "Model 3", hl.pch = 46, hl.cex = 4, bg.pch = 46, bg.cex = 3, las = 1)
-text(fit3$Amean[top7], fit3$coef[top7, 2], fit3$genes$symbol[top7], cex = 0.5, pos = 4)
-```
-
-We check the intersection between the three obtained DE gene sets
-
-```{r}
+```{r intersect}
 length(intersect(rownames(DEgenes_repmes), rownames(DEgenes_paired)))
-length(setdiff(rownames(DEgenes_repmes), rownames(DEgenes_paired)))
-length(setdiff(rownames(DEgenes_paired), rownames(DEgenes_repmes)))
+setdiff(DEgenes_paired$symbol, DEgenes_repmes$symbol)
 ```
 
-As we have saw, tha most of the samples obtained with paired samples, also are obtained with repeated measures. Moreover, as we have adjusted our model regarding paired samples, removing the interpersonal variabilty, those results are more reliable for continuing the analysis.
+As we have previously reported, Paired Design is usually more accurated than Repeated measures, with less falses positives, but our smaple size is not big enough to get good results. Moreover, all genes but three obtained in this analysis are included in *DEgenes_repmes*, so we are going to use this DEgenes to perform the *Functional Enrichmet*, but with higher restrictions to avoid too much falses positives.
 
 ## Session information
 
