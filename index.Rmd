@@ -43,7 +43,7 @@ the [vignette](http://bioconductor.org/packages/release/bioc/vignettes/BiocStyle
 on "Authoring R Markdown vignettes", for full details on how to elaborate this
 kind of documents.  
 
-You also need some other packages, in order to run all the analysis. These are `r Biocpkg("SummarizedExperiment")`, `r Biocpkg("edgeR")`, `r Biocpkg("geneplotter")`, `r Biocpkg("sva")` and `r Biocpkg("corpcor")`.   
+You also need some other packages, in order to run all the analysis. These are `r Biocpkg("SummarizedExperiment")`, `r Biocpkg("edgeR")`, `r Biocpkg("geneplotter")`, `r Biocpkg("sva")`, `r Biocpkg("corpcor")`, `r Biocpkg("limma")`, `r Biocpkg("org.Hs.eg.db")`, `r Biocpkg("GSEABase")`, `r Biocpkg("GSVA")`, `r Biocpkg("GSVAdata")`, `r Biocpkg("xtable")` and `r Biocpkg("Category")`, `r Biocpkg("GOstats")`.
 
 The specific instructions to generate the final HTML report are written in a
 [Makefile](https://en.wikipedia.org/wiki/Makefile). To run it you just need to type
