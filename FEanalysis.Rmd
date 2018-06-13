@@ -1,8 +1,7 @@
 ---
-title: "Functional Enrichment"
-author: "Lydia Fortea"
-date: "8/6/2018"
-output: html_document
+output:
+  bookdown::gitbook: default
+  bookdown::pdf_book: default
 ---
 
 ```{r setup, cache=FALSE, echo=FALSE, results='hide', message=FALSE}
@@ -12,6 +11,7 @@ library(sva)
 library(limma)
 library(org.Hs.eg.db)
 library(GOstats)
+library(GOplot)
 library(GSEABase)
 library(GSVA)
 library(GSVAdata)
@@ -31,26 +31,31 @@ dge <- readRDS(file.path("results", "dge.filt4.rds"))
 
 # Functional Enrichment
 
-Once we have the list of differentially expressed genes obtained by *Linear Regression with Repeated Measures*, we have to know the function and role of those gene within the molecular process under study, *Thyroides carcinoma* in this case. However, not only we need to know the gene function, but also the biological pathway in which they are participating. 
+Once we have the list of differentially expressed genes, we need to know the function and role of those genes within the molecular process under study. However, we not only need to know the gene function, but also the biological pathways in which they are participating. 
 
 ## Gene Ontology Analysis
 
-This is a popular kind of analysis that corresponds to applying the one-tailed Fisher's exact test to every gene set in the GO database, which provides a controlled vocabulary to describe gene and gene product attributes in any organism. There are three types of ontologies, *Bilogical Process, Molecular Function and Cellular Component*, but we are going to focus on the first two, because they are more informative.
+This is a popular analysis that corresponds to applying the one-tailed Fisher's exact test to every gene set in the GO database, which provides a controlled vocabulary to describe gene and gene product attributes in any organism. There are three types of ontologies, *Bilogical Process, Molecular Function and Cellular Component*, but we will focus on the first two, since they are more informative.
 
-Firs of all, we need to download the GO terms for annotated genes in humans and declare the Gene Universe and the studied DEgenes dataset.
+Firs of all, GO terms for annotated genes in humans have to be imported, as well as declare the Gene Universe and the studied DEgenes dataset.
 
 ```{r datago, message=FALSE, warning=FALSE}
-allHumanGO <- select(org.Hs.eg.db, columns = "GO", key = keys(org.Hs.eg.db, keytype = "SYMBOL"), keytype = "SYMBOL")
+allHumanGO <- select(org.Hs.eg.db, columns = "GO", key = keys(org.Hs.eg.db, 
+                      keytype = "SYMBOL"), keytype = "SYMBOL")
 geneUniverse <- rownames(thca)
 DEgenes <- readRDS("DEgenes_repmes.rds")
 ```
 
-Once we have prepared our data, we can start with the analysis taking into account that GO terms are related to each other by parent-child relationship and we want the more specific terms. 
+Once our data is prepared we can start with the analysis, taking into account that GO terms are related to each other by a parent-child relationship and we want the most specific terms. 
 
 ```{r GOanalysis}
-params_bp <- new("GOHyperGParams", geneIds=rownames(DEgenes), universeGeneIds=geneUniverse, annotation="org.Hs.eg.db", ontology="BP", pvalueCutoff=0.05, testDirection="over")
+params_bp <- new("GOHyperGParams", geneIds=rownames(DEgenes), 
+                 universeGeneIds=geneUniverse, annotation="org.Hs.eg.db",
+                 ontology="BP", pvalueCutoff=0.05, testDirection="over")
 
-params_mf <- new("GOHyperGParams", geneIds=rownames(DEgenes), universeGeneIds=geneUniverse, annotation="org.Hs.eg.db", ontology="MF", pvalueCutoff=0.05, testDirection="over")
+params_mf <- new("GOHyperGParams", geneIds=rownames(DEgenes), 
+                 universeGeneIds=geneUniverse, annotation="org.Hs.eg.db", 
+                 ontology="MF", pvalueCutoff=0.05, testDirection="over")
 
 #run the analysis taking into account parent and child terms
 conditional(params_bp) <- TRUE
@@ -67,28 +72,32 @@ head(goresultsbp)
 head(goresultsmf)
 ```
 
-A priori, we have `r dim(goresultsbp)[1]` alterated Biological Process and `dim(goresultsmf)[1]` Molecular Functions. However, GO terms involving a few genes (e.g., < 3) in their Size and in their enrichment Count by DE genes are likely to be less reliable than those that involve many genes. Likewise, large GO terms may provide little insight. That way, we need to filter results as follows:
+A priori, we have `r dim(goresultsbp)[1]` alterated Biological Processes and `r dim(goresultsmf)[1]` Molecular Functions. However, GO terms involving few genes (e.g., < 3) in their Size and in their enrichment Count are likely to be less reliable than those that involve many genes. Likewise, large GO terms may provide little insight. That way, a filtering step is needed.
 
 ```{r GOfilter}
-goresultsbp <- goresultsbp[goresultsbp$Size >= 3 & goresultsbp$Size <=300 & goresultsbp$Count >=3, ]
+goresultsbp <- goresultsbp[goresultsbp$Size >= 3 & goresultsbp$Size <=300 
+                           & goresultsbp$Count >=3, ]
 goresultsbp <- goresultsbp[order(goresultsbp$OddsRatio, decreasing=TRUE), ]
 
-goresultsmf <- goresultsmf[goresultsmf$Size >= 3 & goresultsmf$Size <=300 & goresultsmf$Count >=2, ]
+goresultsmf <- goresultsmf[goresultsmf$Size >= 3 & goresultsmf$Size <=300 
+                           & goresultsmf$Count >=2, ]
 goresultsmf <- goresultsmf[order(goresultsmf$OddsRatio, decreasing=TRUE), ]
 
 dim(goresultsbp)
 dim(goresultsmf)
 ```
 
-Once our DE gene dataset have been filtered, it has `r dim(goresultsbp)[1]` significant affected Biological Process and `r dim(goresultsmf)[1]` Molecular Functions. Now, extracting genes that enrich each GO term must to be done in order to know the role of each DE gene; and exporting results into an HTML report.
+Once our DE gene dataset has been filtered, it has `r dim(goresultsbp)[1]` significant affected Biological Processes and `r dim(goresultsmf)[1]` Molecular Functions. Now, extracting genes that enrich each GO term must be done in order to know the role of each DE gene. The results are exported into an HTML report.
 
 ```{r GOgenes, message=FALSE, warning=FALSE}
 geneIDs_bp <- geneIdsByCategory(hgOver_bp)[goresultsbp$GOBPID]
 geneIDs_mf <- geneIdsByCategory(hgOver_mf)[goresultsmf$GOMFID]
 
-geneSYMs_bp <- sapply(geneIDs_bp, function(id) select(org.Hs.eg.db, columns = "SYMBOL", key = id, keytype = "ENTREZID")$SYMBOL)
+geneSYMs_bp <- sapply(geneIDs_bp, function(id) select(org.Hs.eg.db, 
+                    columns = "SYMBOL", key = id, keytype = "ENTREZID")$SYMBOL)
 geneSYMs_bp <- sapply(geneSYMs_bp, paste, collapse = ", ")
-geneSYMs_mf <- sapply(geneIDs_mf, function(id) select(org.Hs.eg.db, columns = "SYMBOL", key = id, keytype = "ENTREZID")$SYMBOL)
+geneSYMs_mf <- sapply(geneIDs_mf, function(id) select(org.Hs.eg.db, 
+                   columns = "SYMBOL", key = id, keytype = "ENTREZID")$SYMBOL)
 geneSYMs_mf <- sapply(geneSYMs_mf, paste, collapse = ", ")
 
 goresultsbp <- cbind(goresultsbp, Genes = geneSYMs_bp)
@@ -97,25 +106,38 @@ rownames(goresultsbp) <- 1:nrow(goresultsbp)
 rownames(goresultsmf) <- 1:nrow(goresultsmf)
 
 head(goresultsbp, n=10)
-head(goresultsmf, n=9)
+goresultsmf
 
 #Export results
 xtab1 <- xtable(goresultsbp, align = "l|c|r|r|r|r|r|p{3cm}|p{3cm}|")
 xtab2 <- xtable(goresultsmf, align = "l|c|r|r|r|r|r|p{3cm}|p{3cm}|")
-print(xtab1, file = "goresults_bp.html", type = "html")
-print(xtab2, file = "goresults_mf.html", type = "html")
+print(xtab1, file.path("results", "goresults_bp.html"), type = "html")
+print(xtab2, file.path("results", "goresults_mf.html"), type = "html")
 ```
 
-On one hand, *Biological Process* results show several metabolic, cell cycle and development altered pathways. On the other hand, *Molecular Functions* results shows alterated several proteins activation and binding, and also hormones activity.
+*Biological Processes* results show several metabolic, cell cycle and development altered pathways. On the other hand, *Molecular Functions* results shows alterated several proteins activation and binding, and also hormones activity.
+
+A Bar plot for the obtaines GO terms are show in Figure \@ref{fig:barplot}
+
+```{r barplot, fig.height=8, fig.width=12, fig.margin= TRUE, fig.align='center', echo=FALSE, message=FALSE, fig.cap="Barplot from GO-term. Shows the p-values distribution for each GOterm, coloured by their z-scores: yellow bars correspond with high z-scores, cyan ones to low z-scores and black ones to z-score equal to zero"}
+gobp <- data.frame("Category" = "BP", "ID" = goresultsbp$GOBPID, "Term" = goresultsbp$Term, "Genes" = goresultsbp$Genes, "adj_pval" = goresultsbp$Pvalue)
+gomf <- data.frame("Category" = "BP", "ID" = goresultsmf$GOMFID, "Term" = goresultsmf$Term, "Genes" = goresultsmf$Genes, "adj_pval" = goresultsmf$Pvalue)
+gos <- rbind(gobp, gomf)
+genes <- DEgenes[2:8]
+colnames(genes)[1] <- "ID"
+circ <- circle_dat(gos, genes)
+GOBar(circ, display = 'multiple', title = 'Z-score coloured barplot', zsc.col = c('yellow', 'black', 'cyan'))
+```
 
 ## GSEA 
 
-*Gene Set Enrichment Analysis* introduce a method for pathway analysis that address the problem of small gene expression changes by assessing DE directly at gene set level. Its aim is to calculate for each gene set an *enrichment score* as function of the changes in gene expression by the genes forming the gene set.
+*Gene Set Enrichment Analysis* (GSEA) introduces a method for pathway analysis that addresses the problem of small gene expression changes by assessing DE directly at gene set level. Its aim is to calculate for each gene set an *enrichment score* as function of the changes in gene expression by the genes forming the gene set.
 
-In order to perform this analysis within our DE genes adjusted for repeated measures, we need to download REACTOME and KEGG pathways from *Broad Gene Set C2*, and combine them with our geneset.
+In order to perform this analysis within our DE genes adjusted for repeated measures, we need to download REACTOME and KEGG databases from *Broad Gene Set C2*, and combine them with our gene set.
 
-```{r}
-DE <- GeneSet(EntrezIdentifier("org.Hs.eg.db"), geneIds = rownames(DEgenes), setName = "DE genes for repeated measures")
+```{r GeneCollection}
+DE <- GeneSet(EntrezIdentifier("org.Hs.eg.db"), geneIds = rownames(DEgenes), 
+              setName = "DE genes for repeated measures")
 details(DE)
 data(c2BroadSets)
 c2BroadSets <- c2BroadSets[c(grep("^KEGG", names(c2BroadSets)),
@@ -124,11 +146,11 @@ gsc <- GeneSetCollection(c(c2BroadSets, DE))
 gsc
 ```
 
-Once the Collection of Gene Sets is done, the simple GSEA analysis can be performed as follows:
+Once the Collection of gene sets is done, the simple GSEA analysis can be performed as follows:
 
 1. Map the identifiers from gene set to the identifiers of the analyzed data and discard those that are not part from our data or are not annotated in gene sets.
 
-```{r}
+```{r filterdata}
 gsc <- mapIdentifiers(gsc, AnnoOrEntrezIdentifier(metadata(thca)$annotation))
 Im <- incidence(gsc)
 Im <- Im[, colnames(Im) %in% rownames(thca)]
@@ -138,9 +160,9 @@ dim(Im)
 dim(thca)
 ```
 
-2. Start GSEA without calling any gene DE
+2. Start GSEA without calling any gene DE.
 
-```{r}
+```{r gseasimple}
 mod <- model.matrix(~type, data = colData(thca))
 mod0 <- model.matrix(~1, colData(thca))
 sv <- sva(assays(thca)$logCPM, mod = mod, mod0 = mod0)
@@ -148,15 +170,17 @@ mod <- cbind(mod, sv$sv)
 colnames(mod) <- c(colnames(mod)[1:2], paste0("SV", 1:sv$n))
 sample_id <- substr(colnames(thca), 9, 12)
 colData(thca)$sample_id <- factor(sample_id)
-corfit <- duplicateCorrelation(assays(thca)$logCPM, mod, block = thca$sample_id)
-fit <- lmFit(assays(thca)$logCPM, mod, block = thca$sample_id, correlation = corfit$consensus)
+corfit <- duplicateCorrelation(assays(thca)$logCPM, mod, 
+                               block = thca$sample_id)
+fit <- lmFit(assays(thca)$logCPM, mod, block = thca$sample_id, 
+             correlation = corfit$consensus)
 fit <- eBayes(fit, trend = TRUE)
 tt <- topTable(fit, coef = 2, n = Inf)
 ```
 
-Now, *Z-scores* for each genes are computed in order to detect a consistent shift in expression within a gene set. To have robustness in our results, we need to set a minimum size cut-off for our gene sets, such as 10 genes.
+Now, *Z-scores* for each genes are computed in order to detect a consistent shift in expression within a gene set. To have robustness in our results, we need to set a minimum size cut-off for our gene sets, like 10 genes.
 
-```{r}
+```{r zscore}
 Im <- Im[rowSums(Im) >= 10, ]
 dim(Im)
 tGSgenes <- tt[match(colnames(Im), rownames(tt)), "t"]
@@ -166,7 +190,7 @@ rnkGS <- sort(abs(zS), decreasing = TRUE)
 head(rnkGS, n=10)
 ```
 
-From those genesets, which are the most significant enriched set in this analysis, we can observe that the first one is our GeneSet, and the other are related with metabolism and cell cycle process. We plot the mean expression for the first 20 enriched GeneSets, showed in Figure \@ref{fig:GSplot}, to have a better visualization of the results.
+From those genesets, which are the most significant enriched sets in this analysis, we can observe that the first one is our gene set, and the other are related with metabolism and cell cycle processes. We plot the mean expression for the first 20 enriched gene sets, showed in Figure \@ref{fig:GSplot}, to have a better visualization of the results.
 
 ```{r GSfunction, echo=FALSE}
 plotGS <- function(se, gs, pheno, ...) {
@@ -182,19 +206,19 @@ abline(a = 0, b = 1, lwd = 2, col = "red")
 }
 ```
 
-```{r GSplot, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Mean expression for genes between of tumor and normal samples for significant GeneSets. Those genes located close to the red line are not differentially expressed for that pathway, whereas the outlier are the different ones"}
+```{r GSplot, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Mean expression of genes between tumor and normal for <br> significant gene sets. Those genes located close to the red line are not differentially expressed for that pathway, <br> whereas the outliers are the different ones."}
 par(mfrow=c(5,4), mar=c(2, 2, 2, 2))
 for (i in 1:20) {
   genesGS <- colnames(Im)[which(Im[names(rnkGS)[i], ] == 1)]
-  plotGS(thca.pair, genesGS, "type", main = names(rnkGS)[i], cex.lab = 1, las = 1, cex.main=0.5)
+  plotGS(thca, genesGS, "type", main = names(rnkGS)[i], cex.lab = 1, las = 1, cex.main=0.5)
 }
 ```
 
-From all plots, we can observe that most of the genes are not differentially expressed between tumor and sample samples; whereas those genes further from the red line are differentialy expressed in the corresponding GeneSet.
+From all plots, we observe that most of the genes are not differentially expressed between tumor and normal samples; w whereas those genes that lie further from the red line are differentialy expressed in the corresponding gene set.
 
-We perform a Z-test to calculate significative DEgs. The gene set overlaps render those tests dependent, and therefore, multiple testing adjustment becomes conservative. We can still use it to have a first selection of candidate gene sets at, for instance, 1% FDR:
+A Z-test is performed to calculate significative DE genes. The gene set overlaps render those tests dependent, and therefore, multiple testing adjustment becomes conservative. We can still use it to have a first selection of candidate gene sets at 1% FDR:
 
-```{r}
+```{r DEgs}
 pv <- pmin(pnorm(zS), 1 - pnorm(zS))
 sum(pv < 0.05)
 pvadj <- p.adjust(pv, method = "fdr")
@@ -203,21 +227,22 @@ length(DEgs)
 head(DEgs, n = 10)
 ```
 
-We obtain `r length(DEgs)` significant GeneSets. However, the overlap between gene sets should be taken into accoutn when interpreting the occurrence of DE geneset.
+`r length(DEgs)` significant gene sets were obtained. However, the overlap between gene sets should be taken into account when interpreting the significance of DE gene set.
 
-```{r}
+```{r DEgsoverlap}
 gsov <- computeGeneSetsOverlap(gsc[DEgs], rownames(thca))
 trimask <- upper.tri(gsov)
-rnkOv <- data.frame(gs1 = row(gsov)[trimask], gs2 = col(gsov)[trimask], ov = gsov[trimask])
+rnkOv <- data.frame(gs1 = row(gsov)[trimask], gs2 = col(gsov)[trimask], 
+                    ov = gsov[trimask])
 rnkOv <- rnkOv[order(rnkOv$ov, decreasing = TRUE), ]
 rnkOv$gs1 <- rownames(gsov)[rnkOv$gs1]
 rnkOv$gs2 <- rownames(gsov)[rnkOv$gs2]
 sum(rnkOv$ov == 1)
 ```
 
-There are `r sum(rnkOv$ov == 1)` identical GeneSets, which means that they contain the same genes, which leads to redundancy in our results. That way, we are going to discard repeated ones as follows.
+`r sum(rnkOv$ov == 1)` identical gene sets were found, which means that they contain the same genes, which leads to redundancy in our results. That way, repeated gene set will be discarded.
 
-```{r}
+```{r DEgsfilt}
 mask <- rnkOv$ov == 1
 gs_rep <- matrix(rnkOv$gs2[mask])
 gs_rep <- unique(gs_rep)
@@ -225,28 +250,35 @@ DEgs <- DEgs[!DEgs %in% gs_rep]
 length(DEgs)
 ```
 
-Now, there are `r sum(rnkOv$ov == 1) significant and unique enriched GeneSets with our dataset. Anyway, Z-scores can biases our data if we have a balanced DEgenes, known as *Change in scale*. To detect such a change, we should use Chi-2 analysis, to check the results.
+Once filtered our results, `r sum(rnkOv$ov == 1)` significant and unique enriched gene sets were retrieved. Nevertheless, Z-scores can bias our resutls if we have a balanced DE genes dataset, this effect is known as *Change in scale*, and can be detected with a Chi-2 analysis.
 
-```{r}
-xS <- applyByCategory(tGSgenes, Im, function(x) (sum((x - mean(x))^2) - (length(x) - 1))/(2 *(length(x) - 1)))
+```{r Xscore}
+xS <- applyByCategory(tGSgenes, Im, function(x) 
+  (sum((x - mean(x))^2) - (length(x) - 1))/(2 *(length(x) - 1)))
 rnkGS <- sort(abs(xS), decreasing = TRUE)
 pv <- pmin(pnorm(xS), 1 - pnorm(xS))
 pvadj <- p.adjust(pv, method="fdr")
 DEgsByScale <- names(pvadj)[which(pvadj < 0.01)]
 length(intersect(DEgs, DEgsByScale))
 inter <- intersect(DEgs, DEgsByScale)
-write(inter, file= "DE_path_repmes.txt")
+write(inter, file.path("results", "DEpath_repmes.txt"))
 head(inter, n=10)
 ```
 
-We plot again the mean expression for each genes, for the 20 most significant altered pathways, showed in Figures \@ref{fig:GSplot2}
+The mean expression for each gene was plotted again for the 20 most significant databases, showed in Figure \@ref{fig:GSplot2}.
 
-```{r GSplot2, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Mean expression per gene of tumor and normal samples. Those genes located close to the red line are not differentially expressed for that pathway, whereas the outlier are the different ones" }
+```{r GSplot2, echo=FALSE, fig.height=6, fig.width=12, fig.margin= TRUE, out.width="800px", fig.cap="Mean expression per gene of tumor and normal samples. Those genes located close to the red line are not differentially expressed for that pathway, <br> whereas the outlier are the different ones." }
 par(mfrow=c(5,4), mar=c(2, 2, 2, 2))
 for (i in 1:20) {
   topgsgenes <- colnames(Im)[which(Im[names(rnkGS)[i], ] == 1)]
-  plotGS(thca.pair, topgsgenes, "type", main = names(rnkGS)[i], cex.lab = 1, las = 1)
+  plotGS(thca, topgsgenes, "type", main = names(rnkGS)[i], cex.lab = 1, las = 1)
 }
 ```
 
-The enriched GeneSet obtained with our Thyroid Carcinoma dataset are mostly related with metabolism, hormones and cell cycle pathways,; which has much sense taking into account the effect of this type of carcinoma.
+The enriched gene sets obtained with our Thyroid Carcinoma dataset are mostly related with metabolism, hormones and cell cycle pathways; which can be considered as significant results taking into account the phenotype of this carcinoma.
+
+## Session information
+
+```{r, message=FALSE}
+sessionInfo()
+```
